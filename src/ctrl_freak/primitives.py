@@ -121,11 +121,12 @@ def non_dominated_sort(objectives: np.ndarray) -> np.ndarray:
         remaining = remaining[~front_mask]
 
         # Update domination counts: subtract dominance from front members
-        for idx in front:
-            # For each remaining individual, if this front member dominated them,
-            # decrement their count
-            dominated_by_idx = dom_matrix[idx, remaining]
-            domination_count[remaining] -= dominated_by_idx.astype(np.int64)
+        # Vectorized: sum all dominance contributions from front members at once.
+        # dom_matrix[front][:, remaining] is (len(front), len(remaining)) boolean matrix.
+        # Summing axis=0 gives total front members dominating each remaining individual.
+        if len(remaining) > 0:
+            dom_from_front = dom_matrix[front][:, remaining].sum(axis=0)
+            domination_count[remaining] -= dom_from_front
 
         current_rank += 1
 
@@ -185,14 +186,17 @@ def crowding_distance(front_objectives: np.ndarray) -> np.ndarray:
         distances[sorted_indices[0]] = np.inf
         distances[sorted_indices[-1]] = np.inf
 
-        # Interior points: add normalized neighbor distance
+        # Interior points: add normalized neighbor distance (vectorized)
         if obj_range > 0:
-            for i in range(1, n_front - 1):
-                prev_idx = sorted_indices[i - 1]
-                curr_idx = sorted_indices[i]
-                next_idx = sorted_indices[i + 1]
+            # Get objective values in sorted order
+            sorted_values = front_objectives[sorted_indices, m]
 
-                neighbor_dist = front_objectives[next_idx, m] - front_objectives[prev_idx, m]
-                distances[curr_idx] += neighbor_dist / obj_range
+            # Compute neighbor distances for all interior points at once
+            # For position i: dist = (value[i+1] - value[i-1]) / range
+            neighbor_dists = (sorted_values[2:] - sorted_values[:-2]) / obj_range
+
+            # Add to original indices of interior points
+            interior_indices = sorted_indices[1:-1]
+            distances[interior_indices] += neighbor_dists
 
     return distances

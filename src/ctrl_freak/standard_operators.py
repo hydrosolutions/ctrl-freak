@@ -56,17 +56,20 @@ def sbx_crossover(
     def crossover(p1: np.ndarray, p2: np.ndarray) -> np.ndarray:
         """Apply SBX crossover to two parents, returning one child."""
         n_vars = len(p1)
-        child = np.empty(n_vars, dtype=np.float64)
 
-        for i in range(n_vars):
-            u = rng.random()
+        # Generate all random values at once
+        u = rng.random(n_vars)
 
-            beta = (2.0 * u) ** (1.0 / (eta + 1.0)) if u <= 0.5 else (1.0 / (2.0 * (1.0 - u))) ** (1.0 / (eta + 1.0))
+        # Compute beta using vectorized conditional
+        exponent = 1.0 / (eta + 1.0)
+        beta = np.where(u <= 0.5, (2.0 * u) ** exponent, (1.0 / (2.0 * (1.0 - u))) ** exponent)
 
-            # Generate two symmetric children and randomly select one
-            c1 = 0.5 * ((1.0 + beta) * p1[i] + (1.0 - beta) * p2[i])
-            c2 = 0.5 * ((1.0 - beta) * p1[i] + (1.0 + beta) * p2[i])
-            child[i] = c1 if rng.random() < 0.5 else c2
+        # Compute both symmetric children
+        c1 = 0.5 * ((1.0 + beta) * p1 + (1.0 - beta) * p2)
+        c2 = 0.5 * ((1.0 - beta) * p1 + (1.0 + beta) * p2)
+
+        # Randomly select c1 or c2 for each variable
+        child = np.where(rng.random(n_vars) < 0.5, c1, c2)
 
         # Enforce bounds
         lower, upper = bounds
@@ -117,31 +120,38 @@ def polynomial_mutation(
     delta_max = upper - lower
 
     def mutate(x: np.ndarray) -> np.ndarray:
-        """Apply polynomial mutation to an individual."""
+        """Apply polynomial mutation to an individual (vectorized)."""
         n_vars = len(x)
         mutation_prob = prob if prob is not None else 1.0 / n_vars
-        mutated = x.copy()
 
-        for i in range(n_vars):
-            if rng.random() < mutation_prob:
-                # Compute normalized distance to bounds
-                delta_l = (mutated[i] - lower) / delta_max
-                delta_r = (upper - mutated[i]) / delta_max
+        # Generate mutation mask for all variables at once
+        mutation_mask = rng.random(n_vars) < mutation_prob
 
-                u = rng.random()
+        # Early exit if no mutations needed
+        if not np.any(mutation_mask):
+            return x.copy()
 
-                if u < 0.5:
-                    # Mutation towards lower bound
-                    xy = 1.0 - delta_l
-                    val = 2.0 * u + (1.0 - 2.0 * u) * (xy ** (eta + 1.0))
-                    delta_q = val ** (1.0 / (eta + 1.0)) - 1.0
-                else:
-                    # Mutation towards upper bound
-                    xy = 1.0 - delta_r
-                    val = 2.0 * (1.0 - u) + 2.0 * (u - 0.5) * (xy ** (eta + 1.0))
-                    delta_q = 1.0 - val ** (1.0 / (eta + 1.0))
+        # Normalized distances to bounds
+        delta_l = (x - lower) / delta_max
+        delta_r = (upper - x) / delta_max
 
-                mutated[i] = mutated[i] + delta_q * delta_max
+        # Random values for mutation direction
+        u = rng.random(n_vars)
+
+        # Compute delta_q for both branches (mutation towards lower/upper bound)
+        xy_left = 1.0 - delta_l
+        val_left = 2.0 * u + (1.0 - 2.0 * u) * (xy_left ** (eta + 1.0))
+        delta_q_left = val_left ** (1.0 / (eta + 1.0)) - 1.0
+
+        xy_right = 1.0 - delta_r
+        val_right = 2.0 * (1.0 - u) + 2.0 * (u - 0.5) * (xy_right ** (eta + 1.0))
+        delta_q_right = 1.0 - val_right ** (1.0 / (eta + 1.0))
+
+        # Select appropriate delta_q based on u value
+        delta_q = np.where(u < 0.5, delta_q_left, delta_q_right)
+
+        # Apply mutations only where mask is True
+        mutated = np.where(mutation_mask, x + delta_q * delta_max, x)
 
         # Ensure bounds are respected (numerical safety)
         return np.clip(mutated, lower, upper)

@@ -132,5 +132,4 @@ nsga2(init, evaluate, crossover, mutate, pop_size, n_generations, seed=None, cal
 
 ## Future Work
 
-- SBX crossover and polynomial mutation (standard operators for continuous optimization)
 - Parallel evaluation via multiprocessing in `lift()`
