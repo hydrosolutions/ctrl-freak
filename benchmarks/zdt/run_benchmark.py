@@ -111,6 +111,7 @@ def run_pymoo(problem_name: str, problem_fn: callable, seed: int) -> tuple[float
         sampling=FloatRandomSampling(),
         crossover=SBX(eta=SBX_ETA, prob=1.0),
         mutation=PM(eta=PM_ETA, prob=MUTATION_PROB),
+        eliminate_duplicates=False,
     )
 
     termination = get_termination("n_gen", N_GENERATIONS)
@@ -125,7 +126,7 @@ def run_pymoo(problem_name: str, problem_fn: callable, seed: int) -> tuple[float
     )
     elapsed = time.perf_counter() - start_time
 
-    hv = hypervolume(result.F)
+    hv = hypervolume(result.pop.get("F"))
     return hv, elapsed
 
 
