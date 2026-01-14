@@ -130,6 +130,20 @@ nsga2(init, evaluate, crossover, mutate, pop_size, n_generations, seed=None, cal
 
 ---
 
+## Benchmarks
+
+Tested against Pymoo and DEAP on ZDT test problems (100 pop, 250 generations, 10 seeds):
+
+| Problem | ctrl-freak | Pymoo | DEAP |
+|---------|------------|-------|------|
+| ZDT1 | 0.8688 ± 0.0006 | 0.8241 ± 0.0255 | **0.8698 ± 0.0002** |
+| ZDT2 | 0.5356 ± 0.0004 | 0.4764 ± 0.0182 | **0.5363 ± 0.0002** |
+| ZDT3 | 1.3261 ± 0.0006 | 1.2836 ± 0.0123 | **1.3275 ± 0.0002** |
+
+ctrl-freak matches DEAP quality at 2.5x the speed. See [full benchmark results](benchmarks/README.md).
+
+---
+
 ## Future Work
 
 - Parallel evaluation via multiprocessing in `lift()`

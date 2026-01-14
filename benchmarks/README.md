@@ -67,6 +67,12 @@ All libraries configured with identical parameters:
 3. **Speed**: ctrl-freak is ~60% faster than DEAP but ~2x slower than Pymoo
 4. **Pymoo gap**: Pymoo shows lower HV and higher variance, likely due to differences in mutation parameter semantics (per-individual vs per-variable probability)
 
+### Visual Comparison
+
+<img src="zdt/results/zdt3_pareto_comparison.png" alt="ZDT3 Pareto Front Comparison" width="50%">
+
+*ZDT3 discontinuous Pareto front: ctrl-freak and DEAP closely track the true front, while Pymoo shows visible scatter.*
+
 ## How to Run
 
 ```bash
