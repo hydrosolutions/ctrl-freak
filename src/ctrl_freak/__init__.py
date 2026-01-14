@@ -23,6 +23,7 @@ from ctrl_freak.primitives import (
     dominates_matrix,
     non_dominated_sort,
 )
+from ctrl_freak.standard_operators import polynomial_mutation, sbx_crossover
 
 __all__ = [
     # Main algorithm
@@ -37,6 +38,9 @@ __all__ = [
     "dominates_matrix",
     "non_dominated_sort",
     "crowding_distance",
+    # Standard operators
+    "sbx_crossover",
+    "polynomial_mutation",
     # Data structures
     "Population",
     "IndividualView",

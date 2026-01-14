@@ -365,3 +365,117 @@ valid_mask = pareto_mask & feasible_mask
 feasible_pareto_x = final_pop.x[valid_mask]
 feasible_pareto_obj = final_pop.objectives[valid_mask, :2]  # Original objectives only
 ```
+
+---
+
+## Standard Genetic Operators
+
+ctrl-freak provides well-established genetic operators commonly used in evolutionary multi-objective optimization. These are available as factory functions that return operators compatible with `nsga2()`.
+
+### SBX Crossover (Simulated Binary Crossover)
+
+SBX simulates single-point crossover behavior for real-valued variables. It produces children whose distribution around the parent values is controlled by the distribution index `eta`.
+
+```python
+from ctrl_freak import sbx_crossover
+
+# Create crossover operator with default settings
+crossover = sbx_crossover(eta=15.0, bounds=(0.0, 1.0), seed=42)
+
+# Use with two parents
+p1 = np.array([0.2, 0.4, 0.6])
+p2 = np.array([0.3, 0.5, 0.7])
+child = crossover(p1, p2)
+```
+
+**Parameters:**
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `eta` | `float` | 15.0 | Distribution index. Higher values produce children closer to parents; lower values allow more exploration. Typical range: 2-20. |
+| `bounds` | `tuple[float, float]` | (0.0, 1.0) | Lower and upper bounds for decision variables. |
+| `seed` | `int \| None` | None | Random seed for reproducibility. |
+
+### Polynomial Mutation
+
+Polynomial mutation applies a bounded perturbation to each variable with a controllable probability and spread.
+
+```python
+from ctrl_freak import polynomial_mutation
+
+# Create mutation operator with default settings
+mutate = polynomial_mutation(eta=20.0, prob=None, bounds=(0.0, 1.0), seed=42)
+
+# Use with an individual
+x = np.array([0.3, 0.5, 0.7])
+mutated = mutate(x)
+```
+
+**Parameters:**
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `eta` | `float` | 20.0 | Distribution index. Higher values produce smaller perturbations (more local search); lower values allow larger jumps. Typical range: 20-100. |
+| `prob` | `float \| None` | None | Mutation probability per variable. If None, uses 1/n_vars. |
+| `bounds` | `tuple[float, float]` | (0.0, 1.0) | Lower and upper bounds for decision variables. |
+| `seed` | `int \| None` | None | Random seed for reproducibility. |
+
+### Complete Example with Standard Operators
+
+```python
+import numpy as np
+from ctrl_freak import nsga2, sbx_crossover, polynomial_mutation
+
+# Problem configuration
+N_VARS = 30
+BOUNDS = (0.0, 1.0)
+
+def init(rng: np.random.Generator) -> np.ndarray:
+    return rng.uniform(BOUNDS[0], BOUNDS[1], size=N_VARS)
+
+def evaluate(x: np.ndarray) -> np.ndarray:
+    # ZDT1 benchmark
+    f1 = x[0]
+    g = 1 + 9 * np.sum(x[1:]) / (N_VARS - 1)
+    f2 = g * (1 - np.sqrt(f1 / g))
+    return np.array([f1, f2])
+
+# Create standard operators
+crossover = sbx_crossover(eta=15.0, bounds=BOUNDS, seed=100)
+mutate = polynomial_mutation(eta=20.0, bounds=BOUNDS, seed=200)
+
+# Run optimization
+final_pop = nsga2(
+    init=init,
+    evaluate=evaluate,
+    crossover=crossover,
+    mutate=mutate,
+    pop_size=100,
+    n_generations=200,
+    seed=42,
+)
+
+# Extract Pareto front
+pareto_mask = final_pop.rank == 0
+pareto_obj = final_pop.objectives[pareto_mask]
+print(f"Found {pareto_obj.shape[0]} Pareto-optimal solutions")
+```
+
+### Choosing eta Values
+
+The distribution index `eta` controls the exploration/exploitation trade-off:
+
+**For SBX crossover:**
+- Lower `eta` (2-5): More exploration, children can be far from parents
+- Higher `eta` (15-20): More exploitation, children stay close to parents
+- Very high `eta` (50+): Very local search, children very similar to parents
+
+**For polynomial mutation:**
+- Lower `eta` (5-20): Larger perturbations, more exploration
+- Higher `eta` (20-100): Smaller perturbations, fine-tuning
+- Very high `eta` (100+): Very small changes, local refinement
+
+**Typical configurations:**
+- Early exploration: `sbx_crossover(eta=5)`, `polynomial_mutation(eta=20)`
+- Balanced search: `sbx_crossover(eta=15)`, `polynomial_mutation(eta=20)`
+- Local refinement: `sbx_crossover(eta=30)`, `polynomial_mutation(eta=100)`
