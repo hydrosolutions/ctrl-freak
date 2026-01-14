@@ -63,9 +63,10 @@ def sbx_crossover(
 
             beta = (2.0 * u) ** (1.0 / (eta + 1.0)) if u <= 0.5 else (1.0 / (2.0 * (1.0 - u))) ** (1.0 / (eta + 1.0))
 
-            # Generate two children and pick the first one
+            # Generate two symmetric children and randomly select one
             c1 = 0.5 * ((1.0 + beta) * p1[i] + (1.0 - beta) * p2[i])
-            child[i] = c1
+            c2 = 0.5 * ((1.0 - beta) * p1[i] + (1.0 + beta) * p2[i])
+            child[i] = c1 if rng.random() < 0.5 else c2
 
         # Enforce bounds
         lower, upper = bounds

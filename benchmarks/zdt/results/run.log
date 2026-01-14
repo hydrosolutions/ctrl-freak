@@ -1,0 +1,204 @@
+2026-01-14 15:27:25,419 - INFO - Starting ZDT benchmark suite
+2026-01-14 15:27:25,420 - INFO - Parameters: pop_size=100, generations=250, runs=10
+2026-01-14 15:27:25,420 - INFO - Running [1/90]: ctrl-freak on ZDT1 (seed=0)
+2026-01-14 15:27:26,501 - INFO -   HV: 0.8685, Time: 1.08s
+2026-01-14 15:27:26,501 - INFO - Running [2/90]: ctrl-freak on ZDT1 (seed=1)
+2026-01-14 15:27:27,574 - INFO -   HV: 0.8690, Time: 1.07s
+2026-01-14 15:27:27,574 - INFO - Running [3/90]: ctrl-freak on ZDT1 (seed=2)
+2026-01-14 15:27:28,651 - INFO -   HV: 0.8687, Time: 1.08s
+2026-01-14 15:27:28,652 - INFO - Running [4/90]: ctrl-freak on ZDT1 (seed=3)
+2026-01-14 15:27:29,738 - INFO -   HV: 0.8691, Time: 1.09s
+2026-01-14 15:27:29,738 - INFO - Running [5/90]: ctrl-freak on ZDT1 (seed=4)
+2026-01-14 15:27:30,825 - INFO -   HV: 0.8692, Time: 1.09s
+2026-01-14 15:27:30,825 - INFO - Running [6/90]: ctrl-freak on ZDT1 (seed=5)
+2026-01-14 15:27:31,917 - INFO -   HV: 0.8680, Time: 1.09s
+2026-01-14 15:27:31,918 - INFO - Running [7/90]: ctrl-freak on ZDT1 (seed=6)
+2026-01-14 15:27:33,011 - INFO -   HV: 0.8691, Time: 1.09s
+2026-01-14 15:27:33,011 - INFO - Running [8/90]: ctrl-freak on ZDT1 (seed=7)
+2026-01-14 15:27:34,093 - INFO -   HV: 0.8693, Time: 1.08s
+2026-01-14 15:27:34,093 - INFO - Running [9/90]: ctrl-freak on ZDT1 (seed=8)
+2026-01-14 15:27:35,187 - INFO -   HV: 0.8682, Time: 1.09s
+2026-01-14 15:27:35,187 - INFO - Running [10/90]: ctrl-freak on ZDT1 (seed=9)
+2026-01-14 15:27:36,283 - INFO -   HV: 0.8688, Time: 1.10s
+2026-01-14 15:27:36,283 - INFO - Running [11/90]: pymoo on ZDT1 (seed=0)
+2026-01-14 15:27:36,678 - INFO -   HV: 0.8464, Time: 0.39s
+2026-01-14 15:27:36,678 - INFO - Running [12/90]: pymoo on ZDT1 (seed=1)
+2026-01-14 15:27:37,067 - INFO -   HV: 0.8528, Time: 0.39s
+2026-01-14 15:27:37,067 - INFO - Running [13/90]: pymoo on ZDT1 (seed=2)
+2026-01-14 15:27:37,458 - INFO -   HV: 0.8332, Time: 0.39s
+2026-01-14 15:27:37,458 - INFO - Running [14/90]: pymoo on ZDT1 (seed=3)
+2026-01-14 15:27:37,848 - INFO -   HV: 0.7979, Time: 0.39s
+2026-01-14 15:27:37,848 - INFO - Running [15/90]: pymoo on ZDT1 (seed=4)
+2026-01-14 15:27:38,251 - INFO -   HV: 0.8395, Time: 0.40s
+2026-01-14 15:27:38,251 - INFO - Running [16/90]: pymoo on ZDT1 (seed=5)
+2026-01-14 15:27:38,648 - INFO -   HV: 0.8287, Time: 0.40s
+2026-01-14 15:27:38,648 - INFO - Running [17/90]: pymoo on ZDT1 (seed=6)
+2026-01-14 15:27:39,041 - INFO -   HV: 0.8350, Time: 0.39s
+2026-01-14 15:27:39,041 - INFO - Running [18/90]: pymoo on ZDT1 (seed=7)
+2026-01-14 15:27:39,430 - INFO -   HV: 0.8220, Time: 0.39s
+2026-01-14 15:27:39,430 - INFO - Running [19/90]: pymoo on ZDT1 (seed=8)
+2026-01-14 15:27:39,822 - INFO -   HV: 0.8245, Time: 0.39s
+2026-01-14 15:27:39,822 - INFO - Running [20/90]: pymoo on ZDT1 (seed=9)
+2026-01-14 15:27:40,217 - INFO -   HV: 0.7607, Time: 0.39s
+2026-01-14 15:27:40,217 - INFO - Running [21/90]: deap on ZDT1 (seed=0)
+2026-01-14 15:27:42,062 - INFO -   HV: 0.8701, Time: 1.83s
+2026-01-14 15:27:42,062 - INFO - Running [22/90]: deap on ZDT1 (seed=1)
+2026-01-14 15:27:43,890 - INFO -   HV: 0.8692, Time: 1.83s
+2026-01-14 15:27:43,890 - INFO - Running [23/90]: deap on ZDT1 (seed=2)
+2026-01-14 15:27:45,721 - INFO -   HV: 0.8697, Time: 1.83s
+2026-01-14 15:27:45,721 - INFO - Running [24/90]: deap on ZDT1 (seed=3)
+2026-01-14 15:27:47,548 - INFO -   HV: 0.8696, Time: 1.83s
+2026-01-14 15:27:47,548 - INFO - Running [25/90]: deap on ZDT1 (seed=4)
+2026-01-14 15:27:49,378 - INFO -   HV: 0.8698, Time: 1.83s
+2026-01-14 15:27:49,378 - INFO - Running [26/90]: deap on ZDT1 (seed=5)
+2026-01-14 15:27:51,198 - INFO -   HV: 0.8700, Time: 1.82s
+2026-01-14 15:27:51,198 - INFO - Running [27/90]: deap on ZDT1 (seed=6)
+2026-01-14 15:27:53,020 - INFO -   HV: 0.8696, Time: 1.82s
+2026-01-14 15:27:53,020 - INFO - Running [28/90]: deap on ZDT1 (seed=7)
+2026-01-14 15:27:54,840 - INFO -   HV: 0.8700, Time: 1.82s
+2026-01-14 15:27:54,840 - INFO - Running [29/90]: deap on ZDT1 (seed=8)
+2026-01-14 15:27:56,666 - INFO -   HV: 0.8699, Time: 1.83s
+2026-01-14 15:27:56,666 - INFO - Running [30/90]: deap on ZDT1 (seed=9)
+2026-01-14 15:27:58,498 - INFO -   HV: 0.8698, Time: 1.83s
+2026-01-14 15:27:58,498 - INFO - Running [31/90]: ctrl-freak on ZDT2 (seed=0)
+2026-01-14 15:27:59,599 - INFO -   HV: 0.5351, Time: 1.10s
+2026-01-14 15:27:59,599 - INFO - Running [32/90]: ctrl-freak on ZDT2 (seed=1)
+2026-01-14 15:28:00,692 - INFO -   HV: 0.5353, Time: 1.09s
+2026-01-14 15:28:00,692 - INFO - Running [33/90]: ctrl-freak on ZDT2 (seed=2)
+2026-01-14 15:28:01,786 - INFO -   HV: 0.5360, Time: 1.09s
+2026-01-14 15:28:01,786 - INFO - Running [34/90]: ctrl-freak on ZDT2 (seed=3)
+2026-01-14 15:28:02,893 - INFO -   HV: 0.5357, Time: 1.11s
+2026-01-14 15:28:02,893 - INFO - Running [35/90]: ctrl-freak on ZDT2 (seed=4)
+2026-01-14 15:28:04,008 - INFO -   HV: 0.5357, Time: 1.11s
+2026-01-14 15:28:04,008 - INFO - Running [36/90]: ctrl-freak on ZDT2 (seed=5)
+2026-01-14 15:28:05,121 - INFO -   HV: 0.5348, Time: 1.11s
+2026-01-14 15:28:05,121 - INFO - Running [37/90]: ctrl-freak on ZDT2 (seed=6)
+2026-01-14 15:28:06,236 - INFO -   HV: 0.5359, Time: 1.11s
+2026-01-14 15:28:06,236 - INFO - Running [38/90]: ctrl-freak on ZDT2 (seed=7)
+2026-01-14 15:28:07,349 - INFO -   HV: 0.5358, Time: 1.11s
+2026-01-14 15:28:07,349 - INFO - Running [39/90]: ctrl-freak on ZDT2 (seed=8)
+2026-01-14 15:28:08,467 - INFO -   HV: 0.5363, Time: 1.12s
+2026-01-14 15:28:08,467 - INFO - Running [40/90]: ctrl-freak on ZDT2 (seed=9)
+2026-01-14 15:28:09,596 - INFO -   HV: 0.5358, Time: 1.13s
+2026-01-14 15:28:09,596 - INFO - Running [41/90]: pymoo on ZDT2 (seed=0)
+2026-01-14 15:28:09,997 - INFO -   HV: 0.4827, Time: 0.40s
+2026-01-14 15:28:09,997 - INFO - Running [42/90]: pymoo on ZDT2 (seed=1)
+2026-01-14 15:28:10,395 - INFO -   HV: 0.5108, Time: 0.40s
+2026-01-14 15:28:10,395 - INFO - Running [43/90]: pymoo on ZDT2 (seed=2)
+2026-01-14 15:28:10,804 - INFO -   HV: 0.4426, Time: 0.41s
+2026-01-14 15:28:10,804 - INFO - Running [44/90]: pymoo on ZDT2 (seed=3)
+2026-01-14 15:28:11,216 - INFO -   HV: 0.5015, Time: 0.41s
+2026-01-14 15:28:11,216 - INFO - Running [45/90]: pymoo on ZDT2 (seed=4)
+2026-01-14 15:28:11,619 - INFO -   HV: 0.4528, Time: 0.40s
+2026-01-14 15:28:11,620 - INFO - Running [46/90]: pymoo on ZDT2 (seed=5)
+2026-01-14 15:28:12,025 - INFO -   HV: 0.4824, Time: 0.41s
+2026-01-14 15:28:12,025 - INFO - Running [47/90]: pymoo on ZDT2 (seed=6)
+2026-01-14 15:28:12,436 - INFO -   HV: 0.4753, Time: 0.41s
+2026-01-14 15:28:12,436 - INFO - Running [48/90]: pymoo on ZDT2 (seed=7)
+2026-01-14 15:28:12,863 - INFO -   HV: 0.4457, Time: 0.43s
+2026-01-14 15:28:12,863 - INFO - Running [49/90]: pymoo on ZDT2 (seed=8)
+2026-01-14 15:28:13,289 - INFO -   HV: 0.4635, Time: 0.43s
+2026-01-14 15:28:13,289 - INFO - Running [50/90]: pymoo on ZDT2 (seed=9)
+2026-01-14 15:28:13,713 - INFO -   HV: 0.4750, Time: 0.42s
+2026-01-14 15:28:13,713 - INFO - Running [51/90]: deap on ZDT2 (seed=0)
+2026-01-14 15:28:15,617 - INFO -   HV: 0.5366, Time: 1.90s
+2026-01-14 15:28:15,617 - INFO - Running [52/90]: deap on ZDT2 (seed=1)
+2026-01-14 15:28:17,524 - INFO -   HV: 0.5365, Time: 1.91s
+2026-01-14 15:28:17,524 - INFO - Running [53/90]: deap on ZDT2 (seed=2)
+2026-01-14 15:28:19,408 - INFO -   HV: 0.5363, Time: 1.88s
+2026-01-14 15:28:19,408 - INFO - Running [54/90]: deap on ZDT2 (seed=3)
+2026-01-14 15:28:21,400 - INFO -   HV: 0.5365, Time: 1.99s
+2026-01-14 15:28:21,400 - INFO - Running [55/90]: deap on ZDT2 (seed=4)
+2026-01-14 15:28:23,277 - INFO -   HV: 0.5363, Time: 1.88s
+2026-01-14 15:28:23,277 - INFO - Running [56/90]: deap on ZDT2 (seed=5)
+2026-01-14 15:28:25,185 - INFO -   HV: 0.5359, Time: 1.91s
+2026-01-14 15:28:25,185 - INFO - Running [57/90]: deap on ZDT2 (seed=6)
+2026-01-14 15:28:27,068 - INFO -   HV: 0.5367, Time: 1.88s
+2026-01-14 15:28:27,068 - INFO - Running [58/90]: deap on ZDT2 (seed=7)
+2026-01-14 15:28:28,952 - INFO -   HV: 0.5362, Time: 1.88s
+2026-01-14 15:28:28,952 - INFO - Running [59/90]: deap on ZDT2 (seed=8)
+2026-01-14 15:28:30,862 - INFO -   HV: 0.5362, Time: 1.91s
+2026-01-14 15:28:30,862 - INFO - Running [60/90]: deap on ZDT2 (seed=9)
+2026-01-14 15:28:32,772 - INFO -   HV: 0.5362, Time: 1.91s
+2026-01-14 15:28:32,772 - INFO - Running [61/90]: ctrl-freak on ZDT3 (seed=0)
+2026-01-14 15:28:33,918 - INFO -   HV: 1.3254, Time: 1.15s
+2026-01-14 15:28:33,918 - INFO - Running [62/90]: ctrl-freak on ZDT3 (seed=1)
+2026-01-14 15:28:35,046 - INFO -   HV: 1.3261, Time: 1.13s
+2026-01-14 15:28:35,047 - INFO - Running [63/90]: ctrl-freak on ZDT3 (seed=2)
+2026-01-14 15:28:36,176 - INFO -   HV: 1.3258, Time: 1.13s
+2026-01-14 15:28:36,177 - INFO - Running [64/90]: ctrl-freak on ZDT3 (seed=3)
+2026-01-14 15:28:37,305 - INFO -   HV: 1.3269, Time: 1.13s
+2026-01-14 15:28:37,305 - INFO - Running [65/90]: ctrl-freak on ZDT3 (seed=4)
+2026-01-14 15:28:38,426 - INFO -   HV: 1.3256, Time: 1.12s
+2026-01-14 15:28:38,426 - INFO - Running [66/90]: ctrl-freak on ZDT3 (seed=5)
+2026-01-14 15:28:39,547 - INFO -   HV: 1.3268, Time: 1.12s
+2026-01-14 15:28:39,547 - INFO - Running [67/90]: ctrl-freak on ZDT3 (seed=6)
+2026-01-14 15:28:40,667 - INFO -   HV: 1.3258, Time: 1.12s
+2026-01-14 15:28:40,667 - INFO - Running [68/90]: ctrl-freak on ZDT3 (seed=7)
+2026-01-14 15:28:41,783 - INFO -   HV: 1.3267, Time: 1.12s
+2026-01-14 15:28:41,783 - INFO - Running [69/90]: ctrl-freak on ZDT3 (seed=8)
+2026-01-14 15:28:42,904 - INFO -   HV: 1.3259, Time: 1.12s
+2026-01-14 15:28:42,904 - INFO - Running [70/90]: ctrl-freak on ZDT3 (seed=9)
+2026-01-14 15:28:44,035 - INFO -   HV: 1.3257, Time: 1.13s
+2026-01-14 15:28:44,035 - INFO - Running [71/90]: pymoo on ZDT3 (seed=0)
+2026-01-14 15:28:44,443 - INFO -   HV: 1.2879, Time: 0.41s
+2026-01-14 15:28:44,443 - INFO - Running [72/90]: pymoo on ZDT3 (seed=1)
+2026-01-14 15:28:44,847 - INFO -   HV: 1.2966, Time: 0.40s
+2026-01-14 15:28:44,847 - INFO - Running [73/90]: pymoo on ZDT3 (seed=2)
+2026-01-14 15:28:45,249 - INFO -   HV: 1.2824, Time: 0.40s
+2026-01-14 15:28:45,249 - INFO - Running [74/90]: pymoo on ZDT3 (seed=3)
+2026-01-14 15:28:45,658 - INFO -   HV: 1.2719, Time: 0.41s
+2026-01-14 15:28:45,658 - INFO - Running [75/90]: pymoo on ZDT3 (seed=4)
+2026-01-14 15:28:46,058 - INFO -   HV: 1.2951, Time: 0.40s
+2026-01-14 15:28:46,058 - INFO - Running [76/90]: pymoo on ZDT3 (seed=5)
+2026-01-14 15:28:46,463 - INFO -   HV: 1.2956, Time: 0.40s
+2026-01-14 15:28:46,463 - INFO - Running [77/90]: pymoo on ZDT3 (seed=6)
+2026-01-14 15:28:46,869 - INFO -   HV: 1.2590, Time: 0.41s
+2026-01-14 15:28:46,869 - INFO - Running [78/90]: pymoo on ZDT3 (seed=7)
+2026-01-14 15:28:47,271 - INFO -   HV: 1.2962, Time: 0.40s
+2026-01-14 15:28:47,271 - INFO - Running [79/90]: pymoo on ZDT3 (seed=8)
+2026-01-14 15:28:47,676 - INFO -   HV: 1.2721, Time: 0.41s
+2026-01-14 15:28:47,676 - INFO - Running [80/90]: pymoo on ZDT3 (seed=9)
+2026-01-14 15:28:48,078 - INFO -   HV: 1.2787, Time: 0.40s
+2026-01-14 15:28:48,078 - INFO - Running [81/90]: deap on ZDT3 (seed=0)
+2026-01-14 15:28:49,948 - INFO -   HV: 1.3269, Time: 1.87s
+2026-01-14 15:28:49,948 - INFO - Running [82/90]: deap on ZDT3 (seed=1)
+2026-01-14 15:28:51,816 - INFO -   HV: 1.3276, Time: 1.87s
+2026-01-14 15:28:51,816 - INFO - Running [83/90]: deap on ZDT3 (seed=2)
+2026-01-14 15:28:53,681 - INFO -   HV: 1.3275, Time: 1.87s
+2026-01-14 15:28:53,681 - INFO - Running [84/90]: deap on ZDT3 (seed=3)
+2026-01-14 15:28:55,548 - INFO -   HV: 1.3274, Time: 1.87s
+2026-01-14 15:28:55,548 - INFO - Running [85/90]: deap on ZDT3 (seed=4)
+2026-01-14 15:28:57,414 - INFO -   HV: 1.3279, Time: 1.87s
+2026-01-14 15:28:57,414 - INFO - Running [86/90]: deap on ZDT3 (seed=5)
+2026-01-14 15:28:59,290 - INFO -   HV: 1.3276, Time: 1.88s
+2026-01-14 15:28:59,290 - INFO - Running [87/90]: deap on ZDT3 (seed=6)
+2026-01-14 15:29:01,163 - INFO -   HV: 1.3275, Time: 1.87s
+2026-01-14 15:29:01,163 - INFO - Running [88/90]: deap on ZDT3 (seed=7)
+2026-01-14 15:29:03,041 - INFO -   HV: 1.3278, Time: 1.88s
+2026-01-14 15:29:03,041 - INFO - Running [89/90]: deap on ZDT3 (seed=8)
+2026-01-14 15:29:04,905 - INFO -   HV: 1.3276, Time: 1.86s
+2026-01-14 15:29:04,905 - INFO - Running [90/90]: deap on ZDT3 (seed=9)
+2026-01-14 15:29:06,772 - INFO -   HV: 1.3274, Time: 1.87s
+2026-01-14 15:29:06,772 - INFO - Results saved to /Users/nicolaslazaro/Desktop/work/ctrl-freak/benchmarks/zdt/results/benchmark_results.json
+
+================================================================================
+BENCHMARK SUMMARY
+================================================================================
+
+Parameters: pop_size=100, generations=250, runs=10
+
+Problem               ctrl-freak                 pymoo                  deap
+----------------------------------------------------------------------------
+ZDT1              0.8688 +/- 0.0004        0.8241 +/- 0.0255        0.8698 +/- 0.0002
+ZDT2              0.5356 +/- 0.0004        0.4732 +/- 0.0215        0.5363 +/- 0.0002
+ZDT3              1.3261 +/- 0.0005        1.2836 +/- 0.0123        1.3275 +/- 0.0002
+----------------------------------------------------------------------------
+
+Timing (mean seconds per run):
+Problem        ctrl-freak          pymoo           deap
+-------------------------------------------------------
+ZDT1                 1.09           0.39           1.83
+ZDT2                 1.11           0.41           1.91
+ZDT3                 1.13           0.40           1.87
+

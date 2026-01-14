@@ -1,0 +1,662 @@
+{
+  "metadata": {
+    "timestamp": "2026-01-14T14:27:25.420052+00:00",
+    "parameters": {
+      "pop_size": 100,
+      "n_generations": 250,
+      "n_vars": 30,
+      "bounds": [
+        0.0,
+        1.0
+      ],
+      "sbx_eta": 15.0,
+      "pm_eta": 20.0,
+      "mutation_prob": 0.03333333333333333,
+      "n_runs": 10,
+      "seeds": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9
+      ]
+    }
+  },
+  "results": [
+    {
+      "library": "ctrl-freak",
+      "problem": "ZDT1",
+      "seed": 0,
+      "hypervolume": 0.8684990790451839,
+      "time_seconds": 1.0797058750031283
+    },
+    {
+      "library": "ctrl-freak",
+      "problem": "ZDT1",
+      "seed": 1,
+      "hypervolume": 0.8689658288975467,
+      "time_seconds": 1.0723278329969617
+    },
+    {
+      "library": "ctrl-freak",
+      "problem": "ZDT1",
+      "seed": 2,
+      "hypervolume": 0.8687330230702366,
+      "time_seconds": 1.0774378749920288
+    },
+    {
+      "library": "ctrl-freak",
+      "problem": "ZDT1",
+      "seed": 3,
+      "hypervolume": 0.8691451080467023,
+      "time_seconds": 1.0861852079979144
+    },
+    {
+      "library": "ctrl-freak",
+      "problem": "ZDT1",
+      "seed": 4,
+      "hypervolume": 0.8691773708029583,
+      "time_seconds": 1.0872254169953521
+    },
+    {
+      "library": "ctrl-freak",
+      "problem": "ZDT1",
+      "seed": 5,
+      "hypervolume": 0.8680398757014182,
+      "time_seconds": 1.0920176249928772
+    },
+    {
+      "library": "ctrl-freak",
+      "problem": "ZDT1",
+      "seed": 6,
+      "hypervolume": 0.8691282757654427,
+      "time_seconds": 1.0928840410051635
+    },
+    {
+      "library": "ctrl-freak",
+      "problem": "ZDT1",
+      "seed": 7,
+      "hypervolume": 0.8692840165637178,
+      "time_seconds": 1.082715750002535
+    },
+    {
+      "library": "ctrl-freak",
+      "problem": "ZDT1",
+      "seed": 8,
+      "hypervolume": 0.8681653387319881,
+      "time_seconds": 1.0936703750048764
+    },
+    {
+      "library": "ctrl-freak",
+      "problem": "ZDT1",
+      "seed": 9,
+      "hypervolume": 0.8688493859070952,
+      "time_seconds": 1.0954804999928456
+    },
+    {
+      "library": "pymoo",
+      "problem": "ZDT1",
+      "seed": 0,
+      "hypervolume": 0.8464291311701431,
+      "time_seconds": 0.39333637501113117
+    },
+    {
+      "library": "pymoo",
+      "problem": "ZDT1",
+      "seed": 1,
+      "hypervolume": 0.8528065697730732,
+      "time_seconds": 0.38883625000016764
+    },
+    {
+      "library": "pymoo",
+      "problem": "ZDT1",
+      "seed": 2,
+      "hypervolume": 0.8331663548248972,
+      "time_seconds": 0.3908464999985881
+    },
+    {
+      "library": "pymoo",
+      "problem": "ZDT1",
+      "seed": 3,
+      "hypervolume": 0.7979134629195433,
+      "time_seconds": 0.390322749997722
+    },
+    {
+      "library": "pymoo",
+      "problem": "ZDT1",
+      "seed": 4,
+      "hypervolume": 0.8394511639512983,
+      "time_seconds": 0.4021880000072997
+    },
+    {
+      "library": "pymoo",
+      "problem": "ZDT1",
+      "seed": 5,
+      "hypervolume": 0.8286793923069299,
+      "time_seconds": 0.39747616699605715
+    },
+    {
+      "library": "pymoo",
+      "problem": "ZDT1",
+      "seed": 6,
+      "hypervolume": 0.8349942942592086,
+      "time_seconds": 0.39265487500233576
+    },
+    {
+      "library": "pymoo",
+      "problem": "ZDT1",
+      "seed": 7,
+      "hypervolume": 0.8220305616188728,
+      "time_seconds": 0.3888871669914806
+    },
+    {
+      "library": "pymoo",
+      "problem": "ZDT1",
+      "seed": 8,
+      "hypervolume": 0.8245021600617997,
+      "time_seconds": 0.3910379169974476
+    },
+    {
+      "library": "pymoo",
+      "problem": "ZDT1",
+      "seed": 9,
+      "hypervolume": 0.760697340761304,
+      "time_seconds": 0.3949019580031745
+    },
+    {
+      "library": "deap",
+      "problem": "ZDT1",
+      "seed": 0,
+      "hypervolume": 0.8700876717032111,
+      "time_seconds": 1.8346134169987636
+    },
+    {
+      "library": "deap",
+      "problem": "ZDT1",
+      "seed": 1,
+      "hypervolume": 0.8692419002456537,
+      "time_seconds": 1.82779616600601
+    },
+    {
+      "library": "deap",
+      "problem": "ZDT1",
+      "seed": 2,
+      "hypervolume": 0.8696966811731683,
+      "time_seconds": 1.8309311249904567
+    },
+    {
+      "library": "deap",
+      "problem": "ZDT1",
+      "seed": 3,
+      "hypervolume": 0.8695823314965954,
+      "time_seconds": 1.8267250830103876
+    },
+    {
+      "library": "deap",
+      "problem": "ZDT1",
+      "seed": 4,
+      "hypervolume": 0.8698319303471632,
+      "time_seconds": 1.8297633330075769
+    },
+    {
+      "library": "deap",
+      "problem": "ZDT1",
+      "seed": 5,
+      "hypervolume": 0.870038805341391,
+      "time_seconds": 1.8200185830064584
+    },
+    {
+      "library": "deap",
+      "problem": "ZDT1",
+      "seed": 6,
+      "hypervolume": 0.869569221623777,
+      "time_seconds": 1.821114457998192
+    },
+    {
+      "library": "deap",
+      "problem": "ZDT1",
+      "seed": 7,
+      "hypervolume": 0.8699868726999729,
+      "time_seconds": 1.820228832992143
+    },
+    {
+      "library": "deap",
+      "problem": "ZDT1",
+      "seed": 8,
+      "hypervolume": 0.869930416499539,
+      "time_seconds": 1.8260179159988184
+    },
+    {
+      "library": "deap",
+      "problem": "ZDT1",
+      "seed": 9,
+      "hypervolume": 0.8698167418629607,
+      "time_seconds": 1.8316929169959622
+    },
+    {
+      "library": "ctrl-freak",
+      "problem": "ZDT2",
+      "seed": 0,
+      "hypervolume": 0.5351047639483791,
+      "time_seconds": 1.1008887910138583
+    },
+    {
+      "library": "ctrl-freak",
+      "problem": "ZDT2",
+      "seed": 1,
+      "hypervolume": 0.5353108254884419,
+      "time_seconds": 1.0923226250015432
+    },
+    {
+      "library": "ctrl-freak",
+      "problem": "ZDT2",
+      "seed": 2,
+      "hypervolume": 0.5360182971010857,
+      "time_seconds": 1.0943185830110451
+    },
+    {
+      "library": "ctrl-freak",
+      "problem": "ZDT2",
+      "seed": 3,
+      "hypervolume": 0.5356943035743594,
+      "time_seconds": 1.1063931250100723
+    },
+    {
+      "library": "ctrl-freak",
+      "problem": "ZDT2",
+      "seed": 4,
+      "hypervolume": 0.5357214727929667,
+      "time_seconds": 1.114840791997267
+    },
+    {
+      "library": "ctrl-freak",
+      "problem": "ZDT2",
+      "seed": 5,
+      "hypervolume": 0.5347640891653666,
+      "time_seconds": 1.113020165998023
+    },
+    {
+      "library": "ctrl-freak",
+      "problem": "ZDT2",
+      "seed": 6,
+      "hypervolume": 0.5358744096684102,
+      "time_seconds": 1.114826417004224
+    },
+    {
+      "library": "ctrl-freak",
+      "problem": "ZDT2",
+      "seed": 7,
+      "hypervolume": 0.5357682053120528,
+      "time_seconds": 1.113327125000069
+    },
+    {
+      "library": "ctrl-freak",
+      "problem": "ZDT2",
+      "seed": 8,
+      "hypervolume": 0.5363257603232945,
+      "time_seconds": 1.1172052909969352
+    },
+    {
+      "library": "ctrl-freak",
+      "problem": "ZDT2",
+      "seed": 9,
+      "hypervolume": 0.535761886309772,
+      "time_seconds": 1.1286144999903627
+    },
+    {
+      "library": "pymoo",
+      "problem": "ZDT2",
+      "seed": 0,
+      "hypervolume": 0.4826655355356443,
+      "time_seconds": 0.40081291599199176
+    },
+    {
+      "library": "pymoo",
+      "problem": "ZDT2",
+      "seed": 1,
+      "hypervolume": 0.510817477780392,
+      "time_seconds": 0.3983856669947272
+    },
+    {
+      "library": "pymoo",
+      "problem": "ZDT2",
+      "seed": 2,
+      "hypervolume": 0.4425827371995744,
+      "time_seconds": 0.40908166699227877
+    },
+    {
+      "library": "pymoo",
+      "problem": "ZDT2",
+      "seed": 3,
+      "hypervolume": 0.5014979408059783,
+      "time_seconds": 0.41174250000040047
+    },
+    {
+      "library": "pymoo",
+      "problem": "ZDT2",
+      "seed": 4,
+      "hypervolume": 0.452769241973192,
+      "time_seconds": 0.4028747080010362
+    },
+    {
+      "library": "pymoo",
+      "problem": "ZDT2",
+      "seed": 5,
+      "hypervolume": 0.4823710284433352,
+      "time_seconds": 0.405406916004722
+    },
+    {
+      "library": "pymoo",
+      "problem": "ZDT2",
+      "seed": 6,
+      "hypervolume": 0.4752630114054443,
+      "time_seconds": 0.41102787500130944
+    },
+    {
+      "library": "pymoo",
+      "problem": "ZDT2",
+      "seed": 7,
+      "hypervolume": 0.4457180598878822,
+      "time_seconds": 0.42634616600116715
+    },
+    {
+      "library": "pymoo",
+      "problem": "ZDT2",
+      "seed": 8,
+      "hypervolume": 0.4634575026124879,
+      "time_seconds": 0.4254447919956874
+    },
+    {
+      "library": "pymoo",
+      "problem": "ZDT2",
+      "seed": 9,
+      "hypervolume": 0.4750243455581266,
+      "time_seconds": 0.42439566599205136
+    },
+    {
+      "library": "deap",
+      "problem": "ZDT2",
+      "seed": 0,
+      "hypervolume": 0.5366180543439746,
+      "time_seconds": 1.9031185420026304
+    },
+    {
+      "library": "deap",
+      "problem": "ZDT2",
+      "seed": 1,
+      "hypervolume": 0.5365291503611885,
+      "time_seconds": 1.9073449169954984
+    },
+    {
+      "library": "deap",
+      "problem": "ZDT2",
+      "seed": 2,
+      "hypervolume": 0.5362585487613721,
+      "time_seconds": 1.883012249993044
+    },
+    {
+      "library": "deap",
+      "problem": "ZDT2",
+      "seed": 3,
+      "hypervolume": 0.5364973989866223,
+      "time_seconds": 1.9919515840010718
+    },
+    {
+      "library": "deap",
+      "problem": "ZDT2",
+      "seed": 4,
+      "hypervolume": 0.5362647894280104,
+      "time_seconds": 1.877172459004214
+    },
+    {
+      "library": "deap",
+      "problem": "ZDT2",
+      "seed": 5,
+      "hypervolume": 0.5358653287300629,
+      "time_seconds": 1.907925375009654
+    },
+    {
+      "library": "deap",
+      "problem": "ZDT2",
+      "seed": 6,
+      "hypervolume": 0.5366727557677021,
+      "time_seconds": 1.8825811249989783
+    },
+    {
+      "library": "deap",
+      "problem": "ZDT2",
+      "seed": 7,
+      "hypervolume": 0.5361865473444576,
+      "time_seconds": 1.8831019169883803
+    },
+    {
+      "library": "deap",
+      "problem": "ZDT2",
+      "seed": 8,
+      "hypervolume": 0.5361973782215942,
+      "time_seconds": 1.9102906659973087
+    },
+    {
+      "library": "deap",
+      "problem": "ZDT2",
+      "seed": 9,
+      "hypervolume": 0.5361695775793816,
+      "time_seconds": 1.9097529999999097
+    },
+    {
+      "library": "ctrl-freak",
+      "problem": "ZDT3",
+      "seed": 0,
+      "hypervolume": 1.3253552299839817,
+      "time_seconds": 1.14592579100281
+    },
+    {
+      "library": "ctrl-freak",
+      "problem": "ZDT3",
+      "seed": 1,
+      "hypervolume": 1.326094961059184,
+      "time_seconds": 1.1281254579953384
+    },
+    {
+      "library": "ctrl-freak",
+      "problem": "ZDT3",
+      "seed": 2,
+      "hypervolume": 1.3257928595692794,
+      "time_seconds": 1.1298605829942971
+    },
+    {
+      "library": "ctrl-freak",
+      "problem": "ZDT3",
+      "seed": 3,
+      "hypervolume": 1.3268510527497481,
+      "time_seconds": 1.1284500830079196
+    },
+    {
+      "library": "ctrl-freak",
+      "problem": "ZDT3",
+      "seed": 4,
+      "hypervolume": 1.325579289712404,
+      "time_seconds": 1.1203764169913484
+    },
+    {
+      "library": "ctrl-freak",
+      "problem": "ZDT3",
+      "seed": 5,
+      "hypervolume": 1.326769546456837,
+      "time_seconds": 1.1212289169925498
+    },
+    {
+      "library": "ctrl-freak",
+      "problem": "ZDT3",
+      "seed": 6,
+      "hypervolume": 1.3258425256188664,
+      "time_seconds": 1.1198296670045238
+    },
+    {
+      "library": "ctrl-freak",
+      "problem": "ZDT3",
+      "seed": 7,
+      "hypervolume": 1.326724025417524,
+      "time_seconds": 1.1157817079947563
+    },
+    {
+      "library": "ctrl-freak",
+      "problem": "ZDT3",
+      "seed": 8,
+      "hypervolume": 1.325939134928536,
+      "time_seconds": 1.120733542004018
+    },
+    {
+      "library": "ctrl-freak",
+      "problem": "ZDT3",
+      "seed": 9,
+      "hypervolume": 1.3257276635810706,
+      "time_seconds": 1.131311083008768
+    },
+    {
+      "library": "pymoo",
+      "problem": "ZDT3",
+      "seed": 0,
+      "hypervolume": 1.2878740348586348,
+      "time_seconds": 0.4076876250037458
+    },
+    {
+      "library": "pymoo",
+      "problem": "ZDT3",
+      "seed": 1,
+      "hypervolume": 1.2966362946351129,
+      "time_seconds": 0.4037463329877937
+    },
+    {
+      "library": "pymoo",
+      "problem": "ZDT3",
+      "seed": 2,
+      "hypervolume": 1.2823532302175507,
+      "time_seconds": 0.40188958299404476
+    },
+    {
+      "library": "pymoo",
+      "problem": "ZDT3",
+      "seed": 3,
+      "hypervolume": 1.2718926959115644,
+      "time_seconds": 0.4084942920017056
+    },
+    {
+      "library": "pymoo",
+      "problem": "ZDT3",
+      "seed": 4,
+      "hypervolume": 1.2951268510955727,
+      "time_seconds": 0.4004600839980412
+    },
+    {
+      "library": "pymoo",
+      "problem": "ZDT3",
+      "seed": 5,
+      "hypervolume": 1.2955656482807218,
+      "time_seconds": 0.4046697080048034
+    },
+    {
+      "library": "pymoo",
+      "problem": "ZDT3",
+      "seed": 6,
+      "hypervolume": 1.2590095877727798,
+      "time_seconds": 0.40525170900218654
+    },
+    {
+      "library": "pymoo",
+      "problem": "ZDT3",
+      "seed": 7,
+      "hypervolume": 1.2962241495021662,
+      "time_seconds": 0.401728707991424
+    },
+    {
+      "library": "pymoo",
+      "problem": "ZDT3",
+      "seed": 8,
+      "hypervolume": 1.2721275845316142,
+      "time_seconds": 0.4056633750005858
+    },
+    {
+      "library": "pymoo",
+      "problem": "ZDT3",
+      "seed": 9,
+      "hypervolume": 1.2787462067415845,
+      "time_seconds": 0.4017604590044357
+    },
+    {
+      "library": "deap",
+      "problem": "ZDT3",
+      "seed": 0,
+      "hypervolume": 1.3269451248341415,
+      "time_seconds": 1.869910333000007
+    },
+    {
+      "library": "deap",
+      "problem": "ZDT3",
+      "seed": 1,
+      "hypervolume": 1.3276276511893488,
+      "time_seconds": 1.8671328750060638
+    },
+    {
+      "library": "deap",
+      "problem": "ZDT3",
+      "seed": 2,
+      "hypervolume": 1.3275008263980292,
+      "time_seconds": 1.8650006249954458
+    },
+    {
+      "library": "deap",
+      "problem": "ZDT3",
+      "seed": 3,
+      "hypervolume": 1.3274122051770052,
+      "time_seconds": 1.866504833989893
+    },
+    {
+      "library": "deap",
+      "problem": "ZDT3",
+      "seed": 4,
+      "hypervolume": 1.3278549195025207,
+      "time_seconds": 1.8663276669976767
+    },
+    {
+      "library": "deap",
+      "problem": "ZDT3",
+      "seed": 5,
+      "hypervolume": 1.3275607282942976,
+      "time_seconds": 1.8750630829890724
+    },
+    {
+      "library": "deap",
+      "problem": "ZDT3",
+      "seed": 6,
+      "hypervolume": 1.3275041497944793,
+      "time_seconds": 1.8734084169991547
+    },
+    {
+      "library": "deap",
+      "problem": "ZDT3",
+      "seed": 7,
+      "hypervolume": 1.3278020775703625,
+      "time_seconds": 1.877046584006166
+    },
+    {
+      "library": "deap",
+      "problem": "ZDT3",
+      "seed": 8,
+      "hypervolume": 1.3276329140808218,
+      "time_seconds": 1.864256667002337
+    },
+    {
+      "library": "deap",
+      "problem": "ZDT3",
+      "seed": 9,
+      "hypervolume": 1.3273500676649257,
+      "time_seconds": 1.8662436250015162
+    }
+  ]
+}
