@@ -220,6 +220,43 @@ def mutate(x: np.ndarray) -> np.ndarray:
 
 The framework is constraint-agnostic. Users implement constraint handling through their functions.
 
+### Design Philosophy: Feasibility is User Responsibility
+
+**All user functions must return feasible individuals.** This is a consistent contract across `init`, `crossover`, and `mutate`. The framework does not provide a `repair` parameter — if you need to repair solutions, compose your operators with a repair function:
+
+```python
+from ctrl_freak import sbx_crossover, polynomial_mutation
+
+# Your domain-specific repair function
+def repair(x: np.ndarray) -> np.ndarray:
+    # Example: enforce x[0] + x[1] <= 1
+    if x[0] + x[1] > 1:
+        scale = 1 / (x[0] + x[1])
+        x = x.copy()
+        x[0] *= scale
+        x[1] *= scale
+    return x
+
+# Compose repair with standard operators
+sbx = sbx_crossover(eta=15.0, bounds=(0.0, 1.0), seed=42)
+poly_mut = polynomial_mutation(eta=20.0, bounds=(0.0, 1.0), seed=42)
+
+crossover = lambda p1, p2: repair(sbx(p1, p2))
+mutate = lambda x: repair(poly_mut(x))
+
+# Use composed operators
+result = nsga2(
+    init=lambda rng: repair(rng.uniform(0, 1, size=10)),
+    evaluate=evaluate,
+    crossover=crossover,
+    mutate=mutate,
+    pop_size=100,
+    n_generations=50,
+)
+```
+
+This approach keeps the framework simple and gives you full control over when and how repair is applied.
+
 ### Hard Constraints (must be satisfied)
 
 **Strategy 1: Repair in mutation**
