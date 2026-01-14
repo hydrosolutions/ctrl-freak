@@ -4,7 +4,7 @@ A pure numpy implementation of the NSGA-II multi-objective genetic algorithm.
 
 ## Maintenance Status
 
-:large_green_circle: **Active Development**
+🟢 **Active Development**
 
 This repository is part of an ongoing project and actively maintained.
 
