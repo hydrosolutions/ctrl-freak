@@ -29,6 +29,7 @@ from ctrl_freak.registry import (
     list_selections,
     list_survivals,
 )
+from ctrl_freak.results import GAResult, NSGA2Result
 from ctrl_freak.standard_operators import polynomial_mutation, sbx_crossover
 
 __all__ = [
@@ -55,4 +56,7 @@ __all__ = [
     # Data structures
     "Population",
     "IndividualView",
+    # Result types
+    "NSGA2Result",
+    "GAResult",
 ]
