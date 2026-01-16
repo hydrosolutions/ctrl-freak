@@ -2,14 +2,14 @@
 
 This module provides common fixtures used across test modules:
 - rng: Seeded random number generator
-- simple_population: Basic population with rank/crowding computed
+- simple_population: Basic population with objectives
 - Crossover and mutation operator fixtures
 """
 
 import numpy as np
 import pytest
 
-from ctrl_freak import Population, crowding_distance, non_dominated_sort
+from ctrl_freak import Population
 
 
 @pytest.fixture
@@ -20,20 +20,14 @@ def rng() -> np.random.Generator:
 
 @pytest.fixture
 def simple_population() -> Population:
-    """Create a simple population with objectives, rank, and crowding distance.
+    """Create a simple population with objectives.
 
     This population has 4 individuals forming a simple Pareto front structure.
     """
     x = np.array([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0], [7.0, 8.0]])
     objectives = np.array([[1.0, 4.0], [2.0, 3.0], [3.0, 2.0], [4.0, 1.0]])
 
-    ranks = non_dominated_sort(objectives)
-    cd = np.zeros(len(objectives), dtype=np.float64)
-    for r in range(int(ranks.max()) + 1):
-        mask = ranks == r
-        cd[mask] = crowding_distance(objectives[mask])
-
-    return Population(x=x, objectives=objectives, rank=ranks, crowding_distance=cd)
+    return Population(x=x, objectives=objectives)
 
 
 @pytest.fixture

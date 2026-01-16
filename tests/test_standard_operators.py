@@ -472,4 +472,7 @@ class TestIntegration:
         assert np.all(result.x <= bounds[1])
 
         # Should have some Pareto-optimal solutions
-        assert np.sum(result.rank == 0) > 0
+        from ctrl_freak import non_dominated_sort
+
+        ranks = non_dominated_sort(result.objectives)
+        assert np.sum(ranks == 0) > 0

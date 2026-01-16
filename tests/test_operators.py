@@ -9,6 +9,7 @@ Tests the three core functions:
 import numpy as np
 import pytest
 
+from ctrl_freak import crowding_distance as compute_crowding_distance
 from ctrl_freak.operators import create_offspring, lift, select_parents
 from ctrl_freak.population import Population
 
@@ -23,12 +24,24 @@ def rng() -> np.random.Generator:
     return np.random.default_rng(42)
 
 
+def _compute_crowding_for_all_fronts(objectives: np.ndarray, ranks: np.ndarray) -> np.ndarray:
+    """Compute crowding distance for all individuals across all fronts."""
+    cd = np.zeros(len(objectives), dtype=np.float64)
+    for r in range(int(ranks.max()) + 1):
+        mask = ranks == r
+        cd[mask] = compute_crowding_distance(objectives[mask])
+    return cd
+
+
 @pytest.fixture
-def simple_population() -> Population:
-    """Population with rank and crowding_distance set.
+def simple_population() -> tuple[Population, np.ndarray, np.ndarray]:
+    """Population with rank and crowding_distance computed separately.
 
     Creates a population of 6 individuals with varying ranks and crowding distances
     to test selection behavior.
+
+    Returns:
+        Tuple of (population, rank, crowding_distance).
     """
     x = np.array(
         [
@@ -55,7 +68,8 @@ def simple_population() -> Population:
     # Crowding distances: vary within fronts
     crowding_distance = np.array([np.inf, 0.5, np.inf, 0.3, np.inf, 0.2])
 
-    return Population(x=x, objectives=objectives, rank=rank, crowding_distance=crowding_distance)
+    pop = Population(x=x, objectives=objectives)
+    return pop, rank, crowding_distance
 
 
 @pytest.fixture
@@ -229,18 +243,24 @@ class TestLift:
 class TestSelectParents:
     """Tests for binary tournament parent selection."""
 
-    def test_returns_correct_shape(self, simple_population: Population, rng: np.random.Generator) -> None:
+    def test_returns_correct_shape(
+        self, simple_population: tuple[Population, np.ndarray, np.ndarray], rng: np.random.Generator
+    ) -> None:
         """Should return array of shape (n_parents,)."""
-        result = select_parents(simple_population, n_parents=10, rng=rng)
+        pop, rank, crowding_distance = simple_population
+        result = select_parents(pop, n_parents=10, rng=rng, rank=rank, crowding_distance=crowding_distance)
 
         assert result.shape == (10,)
 
-    def test_returns_valid_indices(self, simple_population: Population, rng: np.random.Generator) -> None:
+    def test_returns_valid_indices(
+        self, simple_population: tuple[Population, np.ndarray, np.ndarray], rng: np.random.Generator
+    ) -> None:
         """All returned indices should be valid population indices."""
-        result = select_parents(simple_population, n_parents=100, rng=rng)
+        pop, rank, crowding_distance = simple_population
+        result = select_parents(pop, n_parents=100, rng=rng, rank=rank, crowding_distance=crowding_distance)
 
         assert np.all(result >= 0)
-        assert np.all(result < len(simple_population.x))
+        assert np.all(result < len(pop.x))
 
     def test_prefers_lower_rank(self, rng: np.random.Generator) -> None:
         """Lower rank individuals should be preferred in tournaments."""
@@ -250,13 +270,13 @@ class TestSelectParents:
         rank = np.array([0, 1], dtype=np.int64)  # First is clearly better
         crowding_distance = np.array([1.0, 1.0])  # Equal CD
 
-        pop = Population(x=x, objectives=objectives, rank=rank, crowding_distance=crowding_distance)
+        pop = Population(x=x, objectives=objectives)
 
         # With many trials, the rank-0 individual should win most tournaments
         # When comparing 0 vs 1, rank 0 always wins
         np.random.seed(42)
         test_rng = np.random.default_rng(42)
-        result = select_parents(pop, n_parents=1000, rng=test_rng)
+        result = select_parents(pop, n_parents=1000, rng=test_rng, rank=rank, crowding_distance=crowding_distance)
 
         # Count how often each individual was selected
         count_0 = np.sum(result == 0)
@@ -274,10 +294,10 @@ class TestSelectParents:
         rank = np.array([0, 0], dtype=np.int64)  # Same rank
         crowding_distance = np.array([10.0, 1.0])  # First has much higher CD
 
-        pop = Population(x=x, objectives=objectives, rank=rank, crowding_distance=crowding_distance)
+        pop = Population(x=x, objectives=objectives)
 
         test_rng = np.random.default_rng(42)
-        result = select_parents(pop, n_parents=1000, rng=test_rng)
+        result = select_parents(pop, n_parents=1000, rng=test_rng, rank=rank, crowding_distance=crowding_distance)
 
         count_0 = np.sum(result == 0)
         count_1 = np.sum(result == 1)
@@ -285,49 +305,30 @@ class TestSelectParents:
         # Higher CD (individual 0) should win when they compete
         assert count_0 > count_1
 
-    def test_deterministic_with_seed(self, simple_population: Population) -> None:
+    def test_deterministic_with_seed(self, simple_population: tuple[Population, np.ndarray, np.ndarray]) -> None:
         """Same seed should produce identical results."""
+        pop, rank, crowding_distance = simple_population
         rng1 = np.random.default_rng(12345)
         rng2 = np.random.default_rng(12345)
 
-        result1 = select_parents(simple_population, n_parents=50, rng=rng1)
-        result2 = select_parents(simple_population, n_parents=50, rng=rng2)
+        result1 = select_parents(pop, n_parents=50, rng=rng1, rank=rank, crowding_distance=crowding_distance)
+        result2 = select_parents(pop, n_parents=50, rng=rng2, rank=rank, crowding_distance=crowding_distance)
 
         np.testing.assert_array_equal(result1, result2)
 
-    def test_raises_without_rank(self, rng: np.random.Generator) -> None:
-        """Should raise ValueError if rank is None."""
-        x = np.array([[0.0, 1.0], [2.0, 3.0]])
-        pop = Population(x=x, rank=None, crowding_distance=np.array([1.0, 1.0]))
-
-        with pytest.raises(ValueError, match="rank"):
-            select_parents(pop, n_parents=5, rng=rng)
-
-    def test_raises_without_crowding_distance(self, rng: np.random.Generator) -> None:
-        """Should raise ValueError if crowding_distance is None."""
-        x = np.array([[0.0, 1.0], [2.0, 3.0]])
-        pop = Population(x=x, rank=np.array([0, 1], dtype=np.int64), crowding_distance=None)
-
-        with pytest.raises(ValueError, match="crowding_distance"):
-            select_parents(pop, n_parents=5, rng=rng)
-
-    def test_equal_cd_first_wins(self, rng: np.random.Generator) -> None:
+    def test_equal_cd_first_wins(self) -> None:
         """When rank and CD are equal, first candidate wins (>= on CD)."""
-        x = np.array([[0.0], [1.0]])
-        objectives = np.array([[0.5], [0.5]])
         rank = np.array([0, 0], dtype=np.int64)
         crowding_distance = np.array([1.0, 1.0])  # Exactly equal
-
-        pop = Population(x=x, objectives=objectives, rank=rank, crowding_distance=crowding_distance)
 
         # Create controlled test: fix candidates to always be [0, 1]
         # With >= comparison, candidate 0 (first) should win
         # Manually verify the logic
         candidates = np.array([[0, 1]])
-        rank_a = pop.rank[candidates[:, 0]]  # 0
-        rank_b = pop.rank[candidates[:, 1]]  # 0
-        cd_a = pop.crowding_distance[candidates[:, 0]]  # 1.0
-        cd_b = pop.crowding_distance[candidates[:, 1]]  # 1.0
+        rank_a = rank[candidates[:, 0]]  # 0
+        rank_b = rank[candidates[:, 1]]  # 0
+        cd_a = crowding_distance[candidates[:, 0]]  # 1.0
+        cd_b = crowding_distance[candidates[:, 1]]  # 1.0
 
         a_wins = (rank_a < rank_b) | ((rank_a == rank_b) & (cd_a >= cd_b))
 
@@ -344,78 +345,90 @@ class TestCreateOffspring:
 
     def test_returns_correct_shape(
         self,
-        simple_population: Population,
+        simple_population: tuple[Population, np.ndarray, np.ndarray],
         identity_crossover: callable,
         identity_mutate: callable,
         rng: np.random.Generator,
     ) -> None:
         """Should return array of shape (n_offspring, n_vars)."""
+        pop, rank, crowding_distance = simple_population
         result = create_offspring(
-            simple_population,
+            pop,
             n_offspring=5,
             crossover=identity_crossover,
             mutate=identity_mutate,
             rng=rng,
+            rank=rank,
+            crowding_distance=crowding_distance,
         )
 
         assert result.shape == (5, 2)
 
     def test_calls_crossover_correct_times(
         self,
-        simple_population: Population,
+        simple_population: tuple[Population, np.ndarray, np.ndarray],
         tracking_crossover: tuple[callable, list],
         identity_mutate: callable,
         rng: np.random.Generator,
     ) -> None:
         """Crossover should be called exactly n_offspring times."""
+        pop, rank, crowding_distance = simple_population
         crossover_fn, crossover_calls = tracking_crossover
 
         create_offspring(
-            simple_population,
+            pop,
             n_offspring=7,
             crossover=crossover_fn,
             mutate=identity_mutate,
             rng=rng,
+            rank=rank,
+            crowding_distance=crowding_distance,
         )
 
         assert len(crossover_calls) == 7
 
     def test_calls_mutate_correct_times(
         self,
-        simple_population: Population,
+        simple_population: tuple[Population, np.ndarray, np.ndarray],
         identity_crossover: callable,
         tracking_mutate: tuple[callable, list],
         rng: np.random.Generator,
     ) -> None:
         """Mutation should be called exactly n_offspring times."""
+        pop, rank, crowding_distance = simple_population
         mutate_fn, mutate_calls = tracking_mutate
 
         create_offspring(
-            simple_population,
+            pop,
             n_offspring=7,
             crossover=identity_crossover,
             mutate=mutate_fn,
             rng=rng,
+            rank=rank,
+            crowding_distance=crowding_distance,
         )
 
         assert len(mutate_calls) == 7
 
     def test_crossover_receives_valid_parents(
         self,
-        simple_population: Population,
+        simple_population: tuple[Population, np.ndarray, np.ndarray],
         tracking_crossover: tuple[callable, list],
         identity_mutate: callable,
         rng: np.random.Generator,
     ) -> None:
         """Crossover should receive valid individuals from population."""
+        pop, rank, crowding_distance = simple_population
         crossover_fn, crossover_calls = tracking_crossover
 
         create_offspring(
-            simple_population,
+            pop,
             n_offspring=10,
             crossover=crossover_fn,
             mutate=identity_mutate,
             rng=rng,
+            rank=rank,
+            crowding_distance=crowding_distance,
         )
 
         # Each call should have parents from the population
@@ -423,15 +436,16 @@ class TestCreateOffspring:
             assert p1.shape == (2,)
             assert p2.shape == (2,)
             # Check that p1 and p2 are actual rows from the population
-            assert any(np.array_equal(p1, simple_population.x[i]) for i in range(len(simple_population.x)))
-            assert any(np.array_equal(p2, simple_population.x[i]) for i in range(len(simple_population.x)))
+            assert any(np.array_equal(p1, pop.x[i]) for i in range(len(pop.x)))
+            assert any(np.array_equal(p2, pop.x[i]) for i in range(len(pop.x)))
 
     def test_mutation_receives_crossover_output(
         self,
-        simple_population: Population,
+        simple_population: tuple[Population, np.ndarray, np.ndarray],
         rng: np.random.Generator,
     ) -> None:
         """Mutation should receive the output of crossover."""
+        pop, rank, crowding_distance = simple_population
         crossover_output: list[np.ndarray] = []
         mutate_input: list[np.ndarray] = []
 
@@ -445,11 +459,13 @@ class TestCreateOffspring:
             return x
 
         create_offspring(
-            simple_population,
+            pop,
             n_offspring=3,
             crossover=crossover,
             mutate=mutate,
             rng=rng,
+            rank=rank,
+            crowding_distance=crowding_distance,
         )
 
         # Mutation inputs should match crossover outputs
@@ -459,95 +475,109 @@ class TestCreateOffspring:
 
     def test_deterministic_with_seed(
         self,
-        simple_population: Population,
+        simple_population: tuple[Population, np.ndarray, np.ndarray],
         identity_crossover: callable,
         identity_mutate: callable,
     ) -> None:
         """Same seed should produce identical offspring."""
+        pop, rank, crowding_distance = simple_population
         rng1 = np.random.default_rng(99999)
         rng2 = np.random.default_rng(99999)
 
         result1 = create_offspring(
-            simple_population,
+            pop,
             n_offspring=10,
             crossover=identity_crossover,
             mutate=identity_mutate,
             rng=rng1,
+            rank=rank,
+            crowding_distance=crowding_distance,
         )
 
         result2 = create_offspring(
-            simple_population,
+            pop,
             n_offspring=10,
             crossover=identity_crossover,
             mutate=identity_mutate,
             rng=rng2,
+            rank=rank,
+            crowding_distance=crowding_distance,
         )
 
         np.testing.assert_array_equal(result1, result2)
 
     def test_single_offspring(
         self,
-        simple_population: Population,
+        simple_population: tuple[Population, np.ndarray, np.ndarray],
         identity_crossover: callable,
         identity_mutate: callable,
         rng: np.random.Generator,
     ) -> None:
         """Should work with n_offspring=1."""
+        pop, rank, crowding_distance = simple_population
         result = create_offspring(
-            simple_population,
+            pop,
             n_offspring=1,
             crossover=identity_crossover,
             mutate=identity_mutate,
             rng=rng,
+            rank=rank,
+            crowding_distance=crowding_distance,
         )
 
         assert result.shape == (1, 2)
 
     def test_large_offspring_count(
         self,
-        simple_population: Population,
+        simple_population: tuple[Population, np.ndarray, np.ndarray],
         identity_crossover: callable,
         identity_mutate: callable,
         rng: np.random.Generator,
     ) -> None:
         """Should work with more offspring than population size."""
+        pop, rank, crowding_distance = simple_population
         result = create_offspring(
-            simple_population,
+            pop,
             n_offspring=100,
             crossover=identity_crossover,
             mutate=identity_mutate,
             rng=rng,
+            rank=rank,
+            crowding_distance=crowding_distance,
         )
 
         assert result.shape == (100, 2)
 
     def test_applies_crossover_to_pairs(
         self,
-        simple_population: Population,
+        simple_population: tuple[Population, np.ndarray, np.ndarray],
         identity_mutate: callable,
         rng: np.random.Generator,
     ) -> None:
         """Crossover should be applied to consecutive pairs of selected parents."""
+        pop, rank, crowding_distance = simple_population
         pair_indices: list[tuple[int, int]] = []
 
         def tracking_crossover(p1: np.ndarray, p2: np.ndarray) -> np.ndarray:
             # Find indices of p1 and p2 in population
             idx1 = None
             idx2 = None
-            for i in range(len(simple_population.x)):
-                if np.array_equal(p1, simple_population.x[i]):
+            for i in range(len(pop.x)):
+                if np.array_equal(p1, pop.x[i]):
                     idx1 = i
-                if np.array_equal(p2, simple_population.x[i]):
+                if np.array_equal(p2, pop.x[i]):
                     idx2 = i
             pair_indices.append((idx1, idx2))
             return (p1 + p2) / 2
 
         create_offspring(
-            simple_population,
+            pop,
             n_offspring=3,
             crossover=tracking_crossover,
             mutate=identity_mutate,
             rng=rng,
+            rank=rank,
+            crowding_distance=crowding_distance,
         )
 
         # Should have 3 pairs
@@ -556,5 +586,5 @@ class TestCreateOffspring:
         for idx1, idx2 in pair_indices:
             assert idx1 is not None
             assert idx2 is not None
-            assert 0 <= idx1 < len(simple_population.x)
-            assert 0 <= idx2 < len(simple_population.x)
+            assert 0 <= idx1 < len(pop.x)
+            assert 0 <= idx2 < len(pop.x)

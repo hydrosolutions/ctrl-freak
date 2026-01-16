@@ -1,12 +1,13 @@
-"""Population data structures for NSGA-II optimization.
+"""Population data structures for multi-objective optimization.
 
 This module provides the core data structures for representing populations
-of individuals in the NSGA-II algorithm:
+of individuals in multi-objective optimization algorithms:
 
 - Population: A struct-of-arrays representation of multiple individuals
 - IndividualView: A read-only view of a single individual
 
 Both classes are immutable (frozen dataclasses) to enforce functional style.
+Population is algorithm-agnostic - it only stores decision variables and objectives.
 """
 
 from dataclasses import dataclass
@@ -24,8 +25,6 @@ class IndividualView:
     Attributes:
         x: Decision variables for this individual, shape (n_vars,).
         objectives: Objective values for this individual, shape (n_obj,), or None.
-        rank: Pareto front rank (0 = first front), or None if not computed.
-        crowding_distance: Crowding distance value, or None if not computed.
 
     Example:
         >>> pop = Population(x=np.array([[1.0, 2.0], [3.0, 4.0]]))
@@ -36,8 +35,6 @@ class IndividualView:
 
     x: np.ndarray
     objectives: np.ndarray | None
-    rank: int | None
-    crowding_distance: float | None
 
 
 @dataclass(frozen=True)
@@ -48,11 +45,13 @@ class Population:
     for efficient vectorized operations. All arrays are copied on construction
     to ensure immutability.
 
+    Population is algorithm-agnostic - it only stores decision variables and
+    objective values. Algorithm-specific data (like Pareto ranks or crowding
+    distances) should be managed separately by the algorithm implementation.
+
     Attributes:
         x: Decision variables for all individuals, shape (n, n_vars).
         objectives: Objective values, shape (n, n_obj), or None if not evaluated.
-        rank: Pareto front ranks, shape (n,), or None if not sorted.
-        crowding_distance: Crowding distances, shape (n,), or None if not computed.
 
     Example:
         >>> x = np.array([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]])
@@ -68,8 +67,6 @@ class Population:
 
     x: np.ndarray
     objectives: np.ndarray | None = None
-    rank: np.ndarray | None = None
-    crowding_distance: np.ndarray | None = None
 
     def __post_init__(self) -> None:
         """Validate shapes and copy arrays for immutability.
@@ -98,32 +95,6 @@ class Population:
             if self.objectives.shape[0] != n:
                 raise ValueError(f"objectives has {self.objectives.shape[0]} individuals, expected {n} to match x")
             object.__setattr__(self, "objectives", self.objectives.copy())
-
-        # Validate and copy rank
-        if self.rank is not None:
-            if not isinstance(self.rank, np.ndarray):
-                raise TypeError(f"rank must be a numpy array, got {type(self.rank).__name__}")
-            if self.rank.ndim != 1:
-                raise ValueError(f"rank must be 1D, got shape {self.rank.shape}")
-            if self.rank.shape[0] != n:
-                raise ValueError(f"rank has {self.rank.shape[0]} elements, expected {n} to match x")
-            if not np.issubdtype(self.rank.dtype, np.integer):
-                raise ValueError(f"rank must have integer dtype, got {self.rank.dtype}")
-            object.__setattr__(self, "rank", self.rank.copy())
-
-        # Validate and copy crowding_distance
-        if self.crowding_distance is not None:
-            if not isinstance(self.crowding_distance, np.ndarray):
-                raise TypeError(f"crowding_distance must be a numpy array, got {type(self.crowding_distance).__name__}")
-            if self.crowding_distance.ndim != 1:
-                raise ValueError(f"crowding_distance must be 1D, got shape {self.crowding_distance.shape}")
-            if self.crowding_distance.shape[0] != n:
-                raise ValueError(
-                    f"crowding_distance has {self.crowding_distance.shape[0]} elements, expected {n} to match x"
-                )
-            if not np.issubdtype(self.crowding_distance.dtype, np.floating):
-                raise ValueError(f"crowding_distance must have float dtype, got {self.crowding_distance.dtype}")
-            object.__setattr__(self, "crowding_distance", self.crowding_distance.copy())
 
     def __len__(self) -> int:
         """Return the number of individuals in the population.
@@ -167,8 +138,6 @@ class Population:
         return IndividualView(
             x=self.x[idx],
             objectives=self.objectives[idx] if self.objectives is not None else None,
-            rank=int(self.rank[idx]) if self.rank is not None else None,
-            crowding_distance=float(self.crowding_distance[idx]) if self.crowding_distance is not None else None,
         )
 
     @property

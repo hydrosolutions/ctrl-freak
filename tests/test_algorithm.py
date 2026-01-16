@@ -18,6 +18,16 @@ from ctrl_freak import (
     survivor_selection,
 )
 
+
+def _compute_crowding_for_all_fronts(objectives: np.ndarray, ranks: np.ndarray) -> np.ndarray:
+    """Compute crowding distance for all individuals across all fronts."""
+    cd = np.zeros(len(objectives), dtype=np.float64)
+    for r in range(int(ranks.max()) + 1):
+        mask = ranks == r
+        cd[mask] = crowding_distance(objectives[mask])
+    return cd
+
+
 # =============================================================================
 # TestSurvivorSelection
 # =============================================================================
@@ -36,13 +46,11 @@ class TestSurvivorSelection:
         result = survivor_selection(simple_population, 2)
         assert isinstance(result, Population)
 
-    def test_has_rank_and_crowding_computed(self, simple_population: Population) -> None:
-        """Returned population has rank and crowding_distance arrays."""
+    def test_has_objectives(self, simple_population: Population) -> None:
+        """Returned population has objectives array."""
         result = survivor_selection(simple_population, 2)
-        assert result.rank is not None
-        assert result.crowding_distance is not None
-        assert len(result.rank) == 2
-        assert len(result.crowding_distance) == 2
+        assert result.objectives is not None
+        assert len(result.objectives) == 2
 
     def test_preserves_pareto_front(self) -> None:
         """All Pareto-optimal individuals are preserved when possible."""
@@ -51,7 +59,7 @@ class TestSurvivorSelection:
         objectives = np.array([[1.0, 4.0], [4.0, 1.0], [2.0, 2.0], [3.0, 3.0]])
         # [1,4] and [4,1] are Pareto-optimal; [2,2] dominates [3,3]
 
-        pop = Population(x=x, objectives=objectives, rank=None, crowding_distance=None)
+        pop = Population(x=x, objectives=objectives)
         result = survivor_selection(pop, 3)
 
         # Both Pareto-optimal points should be in survivors
@@ -74,7 +82,7 @@ class TestSurvivorSelection:
             ]
         )
 
-        pop = Population(x=x, objectives=objectives, rank=None, crowding_distance=None)
+        pop = Population(x=x, objectives=objectives)
         result = survivor_selection(pop, 3)
 
         # Boundary points should be preserved (inf crowding distance)
@@ -89,7 +97,7 @@ class TestSurvivorSelection:
 
     def test_raises_on_no_objectives(self) -> None:
         """Raises ValueError if population has no objectives."""
-        pop = Population(x=np.array([[1, 2], [3, 4]]), objectives=None, rank=None, crowding_distance=None)
+        pop = Population(x=np.array([[1, 2], [3, 4]]), objectives=None)
         with pytest.raises(ValueError, match="objectives"):
             survivor_selection(pop, 1)
 
@@ -108,19 +116,21 @@ class TestSurvivorSelection:
         with pytest.raises(ValueError, match="cannot exceed"):
             survivor_selection(simple_population, len(simple_population) + 1)
 
-    def test_recomputes_ranks_for_survivors(self) -> None:
-        """Ranks are recomputed for the survivor population."""
+    def test_survivors_have_correct_ranks_when_recomputed(self) -> None:
+        """Ranks recomputed for survivors are correct."""
         # Create population where removing some individuals changes ranks
         x = np.array([[1, 1], [2, 2], [3, 3], [4, 4]])
         objectives = np.array([[1.0, 4.0], [4.0, 1.0], [2.0, 2.0], [3.0, 3.0]])
         # [1,4] and [4,1] are rank 0; [2,2] is rank 1 (dominated by both); [3,3] is rank 2
 
-        pop = Population(x=x, objectives=objectives, rank=None, crowding_distance=None)
+        pop = Population(x=x, objectives=objectives)
         result = survivor_selection(pop, 3)
 
-        # After selection, ranks should be recomputed
-        expected_ranks = non_dominated_sort(result.objectives)
-        np.testing.assert_array_equal(result.rank, expected_ranks)
+        # Compute ranks for the result and verify they are valid
+        result_ranks = non_dominated_sort(result.objectives)
+        # All ranks should be non-negative and form a proper ranking
+        assert np.all(result_ranks >= 0)
+        assert 0 in result_ranks  # At least one rank 0
 
 
 # =============================================================================
@@ -172,34 +182,6 @@ class TestNSGA2Integration:
         assert result.objectives is not None
         assert result.objectives.shape[0] == 10
         assert result.objectives.shape[1] == 2  # bi-objective
-
-    def test_has_rank_computed(self, simple_biobj_problem: dict) -> None:
-        """Result population has rank array."""
-        result = nsga2(
-            init=simple_biobj_problem["init"],
-            evaluate=simple_biobj_problem["evaluate"],
-            crossover=simple_biobj_problem["crossover"],
-            mutate=simple_biobj_problem["mutate"],
-            pop_size=10,
-            n_generations=5,
-            seed=42,
-        )
-        assert result.rank is not None
-        assert len(result.rank) == 10
-
-    def test_has_crowding_distance_computed(self, simple_biobj_problem: dict) -> None:
-        """Result population has crowding_distance array."""
-        result = nsga2(
-            init=simple_biobj_problem["init"],
-            evaluate=simple_biobj_problem["evaluate"],
-            crossover=simple_biobj_problem["crossover"],
-            mutate=simple_biobj_problem["mutate"],
-            pop_size=10,
-            n_generations=5,
-            seed=42,
-        )
-        assert result.crowding_distance is not None
-        assert len(result.crowding_distance) == 10
 
     def test_deterministic_with_seed(self, simple_biobj_problem: dict) -> None:
         """Same seed produces identical results when operators are deterministic.
@@ -271,8 +253,11 @@ class TestNSGA2Integration:
 
         # Compare using simple dominated hypervolume proxy:
         # Sum of objective values for Pareto front (lower is better for minimization)
-        initial_front = initial_result.objectives[initial_result.rank == 0]
-        final_front = final_result.objectives[final_result.rank == 0]
+        initial_ranks = non_dominated_sort(initial_result.objectives)
+        final_ranks = non_dominated_sort(final_result.objectives)
+
+        initial_front = initial_result.objectives[initial_ranks == 0]
+        final_front = final_result.objectives[final_ranks == 0]
 
         # Mean objective value should decrease (improvement)
         initial_mean = initial_front.mean()
@@ -416,11 +401,9 @@ class TestNSGA2Callback:
             callback=callback,
         )
 
-        # Each population should have complete data
+        # Each population should have objectives
         for pop in populations:
             assert pop.objectives is not None
-            assert pop.rank is not None
-            assert pop.crowding_distance is not None
 
 
 # =============================================================================
@@ -443,7 +426,8 @@ class TestPropertyBased:
             seed=42,
         )
 
-        pareto_front = result.objectives[result.rank == 0]
+        ranks = non_dominated_sort(result.objectives)
+        pareto_front = result.objectives[ranks == 0]
 
         # Check that no solution in the front dominates another
         for i in range(len(pareto_front)):
@@ -468,8 +452,10 @@ class TestPropertyBased:
             seed=42,
         )
 
-        assert result.crowding_distance is not None
-        assert np.all(result.crowding_distance >= 0)
+        # Compute crowding distance for the result
+        ranks = non_dominated_sort(result.objectives)
+        cd = _compute_crowding_for_all_fronts(result.objectives, ranks)
+        assert np.all(cd >= 0)
 
     def test_ranks_are_contiguous(self, zdt1_problem: dict) -> None:
         """Ranks form a contiguous sequence starting from 0."""
@@ -483,8 +469,8 @@ class TestPropertyBased:
             seed=42,
         )
 
-        assert result.rank is not None
-        unique_ranks = np.unique(result.rank)
+        ranks = non_dominated_sort(result.objectives)
+        unique_ranks = np.unique(ranks)
         expected_ranks = np.arange(unique_ranks.max() + 1)
         np.testing.assert_array_equal(unique_ranks, expected_ranks)
 
@@ -540,14 +526,14 @@ class TestPropertyBased:
             seed=42,
         )
 
-        assert result.rank is not None
-        assert result.crowding_distance is not None
+        ranks = non_dominated_sort(result.objectives)
+        cd = _compute_crowding_for_all_fronts(result.objectives, ranks)
 
         # Check each front
-        for r in range(int(result.rank.max()) + 1):
-            mask = result.rank == r
+        for r in range(int(ranks.max()) + 1):
+            mask = ranks == r
             front_obj = result.objectives[mask]
-            front_cd = result.crowding_distance[mask]
+            front_cd = cd[mask]
 
             if len(front_cd) >= 3:
                 # Recompute crowding to verify
@@ -589,10 +575,13 @@ class TestEdgeCases:
         )
 
         assert len(result) == 1
-        assert result.rank is not None
-        assert result.rank[0] == 0  # Single individual is always rank 0
-        assert result.crowding_distance is not None
-        assert np.isinf(result.crowding_distance[0])  # Single individual has inf crowding
+
+        # Compute rank and crowding to verify properties
+        ranks = non_dominated_sort(result.objectives)
+        cd = _compute_crowding_for_all_fronts(result.objectives, ranks)
+
+        assert ranks[0] == 0  # Single individual is always rank 0
+        assert np.isinf(cd[0])  # Single individual has inf crowding
 
     def test_two_individual_population(self) -> None:
         """Handles population of size 2."""
@@ -620,9 +609,13 @@ class TestEdgeCases:
         )
 
         assert len(result) == 2
-        assert result.crowding_distance is not None
-        # With 2 individuals, both should have inf crowding
-        assert np.all(np.isinf(result.crowding_distance))
+
+        # Compute crowding distance
+        ranks = non_dominated_sort(result.objectives)
+        cd = _compute_crowding_for_all_fronts(result.objectives, ranks)
+
+        # With 2 individuals in a front, both should have inf crowding
+        assert np.all(np.isinf(cd))
 
     def test_single_objective_works(self) -> None:
         """Algorithm works with single-objective optimization."""
