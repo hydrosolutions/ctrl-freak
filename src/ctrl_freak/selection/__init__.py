@@ -1,9 +1,11 @@
 """Selection strategies for genetic algorithms."""
 
 from ctrl_freak.selection.crowded import crowded_tournament
+from ctrl_freak.selection.tournament import fitness_tournament
 from ctrl_freak.registry import SelectionRegistry
 
 # Register built-in selection strategies
 SelectionRegistry.register("crowded", crowded_tournament)
+SelectionRegistry.register("tournament", fitness_tournament)
 
-__all__ = ["crowded_tournament"]
+__all__ = ["crowded_tournament", "fitness_tournament"]
