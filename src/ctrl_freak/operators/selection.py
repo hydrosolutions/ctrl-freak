@@ -1,8 +1,6 @@
-"""Genetic operators for NSGA-II.
+"""Selection and offspring creation operators for NSGA-II.
 
-This module provides the core genetic operators for NSGA-II:
-
-- lift: Decorator to apply per-individual functions to entire populations
+This module provides:
 - select_parents: Binary tournament selection using crowded comparison
 - create_offspring: Create offspring via selection, crossover, and mutation
 """
@@ -12,36 +10,6 @@ from collections.abc import Callable
 import numpy as np
 
 from ctrl_freak.population import Population
-
-
-def lift(fn: Callable[[np.ndarray], np.ndarray]) -> Callable[[np.ndarray], np.ndarray]:
-    """Lift a per-individual function to work on a population.
-
-    This utility allows users to write simple per-individual functions
-    while the framework handles batching/vectorization.
-
-    Args:
-        fn: Function that operates on a single individual.
-            Signature: (n_vars,) -> (n_out,)
-
-    Returns:
-        A function that operates on a population.
-        Signature: (n, n_vars) -> (n, n_out)
-
-    Example:
-        >>> def evaluate_one(x: np.ndarray) -> np.ndarray:
-        ...     return np.array([x.sum(), x.prod()])
-        >>> evaluate = lift(evaluate_one)
-        >>> pop_x = np.array([[1.0, 2.0], [3.0, 4.0]])
-        >>> evaluate(pop_x)
-        array([[ 3.,  2.],
-               [ 7., 12.]])
-    """
-
-    def lifted(x: np.ndarray) -> np.ndarray:
-        return np.stack([fn(x[i]) for i in range(x.shape[0])])
-
-    return lifted
 
 
 def select_parents(

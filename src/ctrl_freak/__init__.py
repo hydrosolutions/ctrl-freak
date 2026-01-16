@@ -15,7 +15,7 @@ Example:
 """
 
 from ctrl_freak.algorithm import nsga2, survivor_selection
-from ctrl_freak.operators import create_offspring, lift, select_parents
+from ctrl_freak.operators import create_offspring, lift, polynomial_mutation, sbx_crossover, select_parents
 from ctrl_freak.population import IndividualView, Population
 from ctrl_freak.primitives import (
     crowding_distance,
@@ -30,7 +30,6 @@ from ctrl_freak.registry import (
     list_survivals,
 )
 from ctrl_freak.results import GAResult, NSGA2Result
-from ctrl_freak.standard_operators import polynomial_mutation, sbx_crossover
 
 __all__ = [
     # Main algorithm
