@@ -161,3 +161,71 @@ def simple_biobj_problem():
         return np.clip(x + 0.01 * np.random.randn(len(x)), 0, 1)
 
     return {"init": init, "evaluate": evaluate, "crossover": crossover, "mutate": mutate}
+
+
+@pytest.fixture
+def sphere_problem():
+    """Sphere function single-objective test problem.
+
+    The sphere function is a convex, unimodal function:
+    f(x) = sum(x_i^2)
+
+    - n_vars = 10 decision variables in [-5.12, 5.12]
+    - Global minimum: f(0, 0, ..., 0) = 0
+
+    Returns:
+        Dict with init, evaluate, n_vars, bounds, and known_optimum.
+    """
+    n_vars = 10
+    bounds = (-5.12, 5.12)
+    known_optimum = 0.0
+
+    def init(rng: np.random.Generator) -> np.ndarray:
+        """Initialize a random solution within bounds."""
+        return rng.uniform(bounds[0], bounds[1], size=n_vars)
+
+    def evaluate(x: np.ndarray) -> float:
+        """Evaluate the sphere function."""
+        return float(np.sum(x**2))
+
+    return {
+        "init": init,
+        "evaluate": evaluate,
+        "n_vars": n_vars,
+        "bounds": bounds,
+        "known_optimum": known_optimum,
+    }
+
+
+@pytest.fixture
+def rastrigin_problem():
+    """Rastrigin function single-objective test problem.
+
+    The Rastrigin function is highly multimodal with many local minima:
+    f(x) = 10*n + sum(x_i^2 - 10*cos(2*pi*x_i))
+
+    - n_vars = 10 decision variables in [-5.12, 5.12]
+    - Global minimum: f(0, 0, ..., 0) = 0
+
+    Returns:
+        Dict with init, evaluate, n_vars, bounds, and known_optimum.
+    """
+    n_vars = 10
+    bounds = (-5.12, 5.12)
+    known_optimum = 0.0
+
+    def init(rng: np.random.Generator) -> np.ndarray:
+        """Initialize a random solution within bounds."""
+        return rng.uniform(bounds[0], bounds[1], size=n_vars)
+
+    def evaluate(x: np.ndarray) -> float:
+        """Evaluate the Rastrigin function."""
+        return float(10 * n_vars + np.sum(x**2 - 10 * np.cos(2 * np.pi * x)))
+
+    return {
+        "init": init,
+        "evaluate": evaluate,
+        "n_vars": n_vars,
+        "bounds": bounds,
+        "known_optimum": known_optimum,
+    }
