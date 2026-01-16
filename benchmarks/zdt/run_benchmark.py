@@ -76,7 +76,7 @@ def run_ctrl_freak(problem_name: str, problem_fn: callable, seed: int) -> tuple[
     )
     elapsed = time.perf_counter() - start_time
 
-    hv = hypervolume(result.objectives)
+    hv = hypervolume(result.population.objectives)
     return hv, elapsed
 
 

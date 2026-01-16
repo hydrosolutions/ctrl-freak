@@ -113,6 +113,7 @@ def zdt1_problem():
         Dict with init, evaluate, crossover, and mutate functions.
     """
     n_vars = 5
+    mutation_rng = np.random.default_rng(12345)  # Seeded RNG for mutations
 
     def init(rng: np.random.Generator) -> np.ndarray:
         return rng.uniform(0, 1, size=n_vars)
@@ -127,7 +128,7 @@ def zdt1_problem():
         return (p1 + p2) / 2
 
     def mutate(x: np.ndarray) -> np.ndarray:
-        return np.clip(x + 0.01 * np.random.randn(len(x)), 0, 1)
+        return np.clip(x + 0.01 * mutation_rng.standard_normal(len(x)), 0, 1)
 
     return {"init": init, "evaluate": evaluate, "crossover": crossover, "mutate": mutate}
 
