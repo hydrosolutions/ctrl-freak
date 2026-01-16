@@ -1,6 +1,7 @@
-"""NSGA-II primitives for Pareto-based ranking and diversity.
+"""NSGA-II Pareto-based primitives for ranking and diversity.
 
-This module provides the core pure functions for NSGA-II:
+This module provides the core pure functions for Pareto-based multi-objective
+optimization used in NSGA-II:
 - dominates: scalar Pareto dominance check
 - dominates_matrix: vectorized pairwise dominance
 - non_dominated_sort: Deb's fast non-dominated sorting algorithm

@@ -2,14 +2,14 @@
 
 This module provides common fixtures used across test modules:
 - rng: Seeded random number generator
-- simple_population: Basic population with rank/crowding computed
+- simple_population: Basic population with objectives
 - Crossover and mutation operator fixtures
 """
 
 import numpy as np
 import pytest
 
-from ctrl_freak import Population, crowding_distance, non_dominated_sort
+from ctrl_freak import Population
 
 
 @pytest.fixture
@@ -20,20 +20,14 @@ def rng() -> np.random.Generator:
 
 @pytest.fixture
 def simple_population() -> Population:
-    """Create a simple population with objectives, rank, and crowding distance.
+    """Create a simple population with objectives.
 
     This population has 4 individuals forming a simple Pareto front structure.
     """
     x = np.array([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0], [7.0, 8.0]])
     objectives = np.array([[1.0, 4.0], [2.0, 3.0], [3.0, 2.0], [4.0, 1.0]])
 
-    ranks = non_dominated_sort(objectives)
-    cd = np.zeros(len(objectives), dtype=np.float64)
-    for r in range(int(ranks.max()) + 1):
-        mask = ranks == r
-        cd[mask] = crowding_distance(objectives[mask])
-
-    return Population(x=x, objectives=objectives, rank=ranks, crowding_distance=cd)
+    return Population(x=x, objectives=objectives)
 
 
 @pytest.fixture
@@ -119,6 +113,7 @@ def zdt1_problem():
         Dict with init, evaluate, crossover, and mutate functions.
     """
     n_vars = 5
+    mutation_rng = np.random.default_rng(12345)  # Seeded RNG for mutations
 
     def init(rng: np.random.Generator) -> np.ndarray:
         return rng.uniform(0, 1, size=n_vars)
@@ -133,7 +128,7 @@ def zdt1_problem():
         return (p1 + p2) / 2
 
     def mutate(x: np.ndarray) -> np.ndarray:
-        return np.clip(x + 0.01 * np.random.randn(len(x)), 0, 1)
+        return np.clip(x + 0.01 * mutation_rng.standard_normal(len(x)), 0, 1)
 
     return {"init": init, "evaluate": evaluate, "crossover": crossover, "mutate": mutate}
 
@@ -166,3 +161,71 @@ def simple_biobj_problem():
         return np.clip(x + 0.01 * np.random.randn(len(x)), 0, 1)
 
     return {"init": init, "evaluate": evaluate, "crossover": crossover, "mutate": mutate}
+
+
+@pytest.fixture
+def sphere_problem():
+    """Sphere function single-objective test problem.
+
+    The sphere function is a convex, unimodal function:
+    f(x) = sum(x_i^2)
+
+    - n_vars = 10 decision variables in [-5.12, 5.12]
+    - Global minimum: f(0, 0, ..., 0) = 0
+
+    Returns:
+        Dict with init, evaluate, n_vars, bounds, and known_optimum.
+    """
+    n_vars = 10
+    bounds = (-5.12, 5.12)
+    known_optimum = 0.0
+
+    def init(rng: np.random.Generator) -> np.ndarray:
+        """Initialize a random solution within bounds."""
+        return rng.uniform(bounds[0], bounds[1], size=n_vars)
+
+    def evaluate(x: np.ndarray) -> float:
+        """Evaluate the sphere function."""
+        return float(np.sum(x**2))
+
+    return {
+        "init": init,
+        "evaluate": evaluate,
+        "n_vars": n_vars,
+        "bounds": bounds,
+        "known_optimum": known_optimum,
+    }
+
+
+@pytest.fixture
+def rastrigin_problem():
+    """Rastrigin function single-objective test problem.
+
+    The Rastrigin function is highly multimodal with many local minima:
+    f(x) = 10*n + sum(x_i^2 - 10*cos(2*pi*x_i))
+
+    - n_vars = 10 decision variables in [-5.12, 5.12]
+    - Global minimum: f(0, 0, ..., 0) = 0
+
+    Returns:
+        Dict with init, evaluate, n_vars, bounds, and known_optimum.
+    """
+    n_vars = 10
+    bounds = (-5.12, 5.12)
+    known_optimum = 0.0
+
+    def init(rng: np.random.Generator) -> np.ndarray:
+        """Initialize a random solution within bounds."""
+        return rng.uniform(bounds[0], bounds[1], size=n_vars)
+
+    def evaluate(x: np.ndarray) -> float:
+        """Evaluate the Rastrigin function."""
+        return float(10 * n_vars + np.sum(x**2 - 10 * np.cos(2 * np.pi * x)))
+
+    return {
+        "init": init,
+        "evaluate": evaluate,
+        "n_vars": n_vars,
+        "bounds": bounds,
+        "known_optimum": known_optimum,
+    }

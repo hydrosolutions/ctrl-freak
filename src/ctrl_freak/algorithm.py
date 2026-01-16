@@ -41,15 +41,15 @@ def survivor_selection(pop: Population, n_survivors: int) -> Population:
     1. Compute Pareto ranks for combined population
     2. Fill survivors front-by-front until capacity
     3. For critical front (partial fit), select by highest crowding distance
-    4. Recompute rank and crowding distance for survivors
 
     Args:
         pop: Combined P + Q population with objectives computed (2N individuals).
         n_survivors: Target size (N).
 
     Returns:
-        New Population of size n_survivors with rank and crowding_distance
-        computed, ready for next generation's selection.
+        New Population of size n_survivors with x and objectives.
+        Algorithm-specific data (rank, crowding distance) is computed internally
+        for selection but not stored on the returned Population.
 
     Raises:
         ValueError: If population has no objectives or n_survivors is invalid.
@@ -94,15 +94,11 @@ def survivor_selection(pop: Population, n_survivors: int) -> Population:
 
     selected_arr = np.array(selected)
 
-    # Extract selected individuals
+    # Extract selected individuals - only x and objectives
     new_x = pop.x[selected_arr]
     new_obj = pop.objectives[selected_arr]
 
-    # Recompute rank and crowding distance for survivors
-    new_ranks = non_dominated_sort(new_obj)
-    new_cd = _compute_crowding_for_all_fronts(new_obj, new_ranks)
-
-    return Population(x=new_x, objectives=new_obj, rank=new_ranks, crowding_distance=new_cd)
+    return Population(x=new_x, objectives=new_obj)
 
 
 def nsga2(
@@ -139,8 +135,8 @@ def nsga2(
             If callback returns True, optimization stops early.
 
     Returns:
-        Final population with rank and crowding_distance computed.
-        Pareto-optimal solutions can be extracted via: pop.x[pop.rank == 0]
+        Final population with x and objectives. Pareto-optimal solutions can
+        be extracted by computing ranks: pop.x[non_dominated_sort(pop.objectives) == 0]
 
     Raises:
         ValueError: If pop_size or n_generations is not positive.
@@ -169,11 +165,11 @@ def nsga2(
     init_x = np.stack([init(rng) for _ in range(pop_size)])
     init_obj = lift(evaluate)(init_x)
 
-    # Compute initial ranks and crowding distances
+    # Compute initial ranks and crowding distances (algorithm-local, not stored in Population)
     ranks = non_dominated_sort(init_obj)
     cd = _compute_crowding_for_all_fronts(init_obj, ranks)
 
-    pop = Population(x=init_x, objectives=init_obj, rank=ranks, crowding_distance=cd)
+    pop = Population(x=init_x, objectives=init_obj)
 
     # Main evolutionary loop
     for gen in range(n_generations):
@@ -181,19 +177,26 @@ def nsga2(
         if callback is not None and callback(pop, gen):
             break
 
-        # Create offspring
-        offspring_x = create_offspring(pop, pop_size, crossover, mutate, rng)
+        # Create offspring using current rank and crowding distance for selection
+        offspring_x = create_offspring(pop, pop_size, crossover, mutate, rng, rank=ranks, crowding_distance=cd)
         offspring_obj = lift(evaluate)(offspring_x)
 
         # Combine parent and offspring populations
+        # pop.objectives is guaranteed non-None here since we initialized with objectives
+        assert pop.objectives is not None
         combined = Population(
             x=np.concatenate([pop.x, offspring_x]),
             objectives=np.concatenate([pop.objectives, offspring_obj]),
-            rank=None,
-            crowding_distance=None,
         )
 
         # Select survivors for next generation
         pop = survivor_selection(combined, pop_size)
+
+        # Recompute ranks and crowding distances for next generation's selection
+        # These are needed for create_offspring but not stored in Population
+        # pop.objectives is guaranteed non-None after survivor_selection
+        assert pop.objectives is not None
+        ranks = non_dominated_sort(pop.objectives)
+        cd = _compute_crowding_for_all_fronts(pop.objectives, ranks)
 
     return pop

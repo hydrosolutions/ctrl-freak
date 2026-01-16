@@ -1,6 +1,6 @@
 # ctrl-freak: API Usage Guide
 
-This guide covers the practical usage of ctrl-freak for multi-objective optimization with NSGA-II.
+This guide covers the practical usage of ctrl-freak for genetic algorithms, including both multi-objective optimization (NSGA-II) and single-objective optimization (standard GA).
 
 ---
 
@@ -18,7 +18,7 @@ A complete minimal example optimizing the ZDT1 benchmark (2 objectives, 30 decis
 
 ```python
 import numpy as np
-from ctrl_freak import nsga2, Population
+from ctrl_freak import nsga2
 
 # Problem definition
 N_VARS = 30
@@ -46,7 +46,7 @@ def mutate(x: np.ndarray) -> np.ndarray:
     return np.clip(mutated, BOUNDS[0], BOUNDS[1])
 
 # Run optimization
-final_pop = nsga2(
+result = nsga2(
     init=init,
     evaluate=evaluate,
     crossover=crossover,
@@ -56,10 +56,10 @@ final_pop = nsga2(
     seed=42,
 )
 
-# Extract Pareto front
-pareto_mask = final_pop.rank == 0
-pareto_x = final_pop.x[pareto_mask]           # Decision variables
-pareto_obj = final_pop.objectives[pareto_mask] # Objective values
+# Extract Pareto front using result's pareto_front property
+pareto_front = result.pareto_front
+pareto_x = pareto_front.x           # Decision variables
+pareto_obj = pareto_front.objectives # Objective values
 
 print(f"Pareto front size: {pareto_x.shape[0]}")
 ```
@@ -70,15 +70,13 @@ print(f"Pareto front size: {pareto_x.shape[0]}")
 
 ### Population Dataclass
 
-The `Population` dataclass holds all individuals and their computed attributes:
+The `Population` dataclass holds all individuals and their core data:
 
 ```python
 @dataclass(frozen=True)
 class Population:
     x: np.ndarray                         # (n, n_vars) decision variables
     objectives: np.ndarray | None         # (n, n_obj) objective values
-    rank: np.ndarray | None               # (n,) Pareto front rank (0 = optimal)
-    crowding_distance: np.ndarray | None  # (n,) diversity measure
 ```
 
 Key properties:
@@ -95,30 +93,43 @@ all_x = pop.x  # Shape: (pop_size, n_vars)
 
 # Objectives for all individuals
 all_obj = pop.objectives  # Shape: (pop_size, n_obj)
-
-# Ranks (lower = better, 0 = Pareto optimal)
-all_ranks = pop.rank  # Shape: (pop_size,)
-
-# Crowding distances (higher = more isolated = preferred)
-all_cd = pop.crowding_distance  # Shape: (pop_size,)
 ```
+
+### Result Types
+
+Algorithm-specific metadata (such as Pareto ranks and crowding distances) are returned in result objects, not stored on `Population`:
+
+- **`NSGA2Result`**: Returned by `nsga2()`, includes `population`, `rank`, `crowding_distance`, and `pareto_front` property
+- **`GAResult`**: Returned by `ga()`, includes `population`, `fitness`, and `best` property
 
 ### Extracting the Pareto Front
 
-The Pareto-optimal solutions have `rank == 0`:
+Use the `pareto_front` property from `NSGA2Result`:
+
+```python
+result = nsga2(...)
+
+# Access Pareto front directly
+pareto_front = result.pareto_front  # Population of rank-0 individuals
+
+# Decision variables of Pareto front
+pareto_x = pareto_front.x
+
+# Objectives of Pareto front
+pareto_obj = pareto_front.objectives
+
+# Number of Pareto-optimal solutions
+n_pareto = len(pareto_front.x)
+```
+
+You can also access rank data directly:
 
 ```python
 # Boolean mask for Pareto-optimal individuals
-pareto_mask = pop.rank == 0
+pareto_mask = result.rank == 0
 
-# Decision variables of Pareto front
-pareto_x = pop.x[pareto_mask]
-
-# Objectives of Pareto front
-pareto_obj = pop.objectives[pareto_mask]
-
-# Number of Pareto-optimal solutions
-n_pareto = np.sum(pareto_mask)
+# Equivalent to result.pareto_front.x
+pareto_x = result.population.x[pareto_mask]
 ```
 
 ### IndividualView
@@ -131,11 +142,116 @@ individual = pop[0]  # Returns IndividualView
 # IndividualView attributes (all 1D or scalar)
 individual.x                  # (n_vars,) decision variables
 individual.objectives         # (n_obj,) objectives
-individual.rank               # int
-individual.crowding_distance  # float
 ```
 
-`IndividualView` is read-only and useful for inspection or logging.
+`IndividualView` is read-only and useful for inspection or logging. Note that algorithm-specific metadata (rank, crowding distance, fitness) is not on `IndividualView` - access it from the result object instead.
+
+---
+
+## Single-Objective Optimization with ga()
+
+For single-objective optimization, use the `ga()` function which implements a standard genetic algorithm with customizable selection and survival strategies.
+
+### Quick Start Example
+
+```python
+import numpy as np
+from ctrl_freak import ga
+
+def init(rng):
+    return rng.uniform(-5.12, 5.12, size=10)
+
+def evaluate(x):
+    return float(np.sum(x**2))  # Sphere function, returns float
+
+def crossover(p1, p2):
+    alpha = np.random.random()
+    return alpha * p1 + (1 - alpha) * p2
+
+def mutate(x):
+    return np.clip(x + np.random.normal(0, 0.5, size=len(x)), -5.12, 5.12)
+
+result = ga(
+    init=init,
+    evaluate=evaluate,
+    crossover=crossover,
+    mutate=mutate,
+    pop_size=100,
+    n_generations=200,
+    seed=42,
+)
+
+print(f"Best fitness: {result.best[1]}")
+print(f"Best solution: {result.best[0]}")
+```
+
+### Function Signature
+
+```python
+def ga(
+    init: Callable[[np.random.Generator], np.ndarray],
+    evaluate: Callable[[np.ndarray], float],
+    crossover: Callable[[np.ndarray, np.ndarray], np.ndarray],
+    mutate: Callable[[np.ndarray], np.ndarray],
+    pop_size: int,
+    n_generations: int,
+    seed: int | None = None,
+    callback: Callable[[GAResult, int], bool] | None = None,
+    select: str | ParentSelector = 'tournament',
+    survive: str | SurvivorSelector = 'elitist',
+) -> GAResult
+```
+
+### GAResult Structure
+
+The `GAResult` dataclass contains the final population and algorithm-specific metadata:
+
+```python
+@dataclass(frozen=True)
+class GAResult:
+    population: Population        # Final population
+    fitness: np.ndarray          # (n,) fitness values (lower is better)
+
+    @property
+    def best(self) -> tuple[np.ndarray, float]:
+        """Returns (x, fitness) of the best individual."""
+```
+
+### Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `init` | `(rng) -> (n_vars,)` | Initialize one individual using the provided RNG |
+| `evaluate` | `(n_vars,) -> float` | Compute fitness for one individual (lower is better) |
+| `crossover` | `(n_vars,), (n_vars,) -> (n_vars,)` | Combine two parents into one child |
+| `mutate` | `(n_vars,) -> (n_vars,)` | Mutate one individual |
+| `pop_size` | `int` | Number of individuals in the population |
+| `n_generations` | `int` | Maximum number of generations |
+| `seed` | `int \| None` | Random seed for reproducibility |
+| `callback` | `(result, gen) -> bool` | Optional function called each generation; return `True` to stop |
+| `select` | `str \| ParentSelector` | Parent selection strategy (default: 'tournament') |
+| `survive` | `str \| SurvivorSelector` | Survival selection strategy (default: 'elitist') |
+
+### Example: Tracking Convergence
+
+```python
+best_history = []
+
+def track_convergence(result: GAResult, gen: int) -> bool:
+    best_fitness = result.best[1]
+    best_history.append(best_fitness)
+    print(f"Gen {gen}: best = {best_fitness:.6f}")
+    return False  # Continue
+
+result = ga(..., callback=track_convergence)
+
+# Plot convergence
+import matplotlib.pyplot as plt
+plt.plot(best_history)
+plt.xlabel('Generation')
+plt.ylabel('Best Fitness')
+plt.show()
+```
 
 ---
 
@@ -152,8 +268,26 @@ def nsga2(
     pop_size: int,
     n_generations: int,
     seed: int | None = None,
-    callback: Callable[[Population, int], bool] | None = None,
-) -> Population
+    callback: Callable[[NSGA2Result, int], bool] | None = None,
+    select: str | ParentSelector = 'crowded',
+    survive: str | SurvivorSelector = 'nsga2',
+) -> NSGA2Result
+```
+
+### NSGA2Result Structure
+
+The `NSGA2Result` dataclass contains the final population and NSGA-II-specific metadata:
+
+```python
+@dataclass(frozen=True)
+class NSGA2Result:
+    population: Population           # Final population
+    rank: np.ndarray                # (n,) Pareto front rank (0 = optimal)
+    crowding_distance: np.ndarray   # (n,) diversity measure
+
+    @property
+    def pareto_front(self) -> Population:
+        """Returns Population of rank-0 (Pareto-optimal) individuals."""
 ```
 
 ### Parameters
@@ -167,7 +301,9 @@ def nsga2(
 | `pop_size` | `int` | Number of individuals in the population |
 | `n_generations` | `int` | Maximum number of generations |
 | `seed` | `int \| None` | Random seed for reproducibility |
-| `callback` | `(pop, gen) -> bool` | Optional function called each generation; return `True` to stop |
+| `callback` | `(result, gen) -> bool` | Optional function called each generation; return `True` to stop |
+| `select` | `str \| ParentSelector` | Parent selection strategy (default: 'crowded') |
+| `survive` | `str \| SurvivorSelector` | Survival selection strategy (default: 'nsga2') |
 
 ### Using Callbacks
 
@@ -176,13 +312,13 @@ Callbacks enable logging, early stopping, and custom termination conditions.
 **Logging progress:**
 
 ```python
-def log_progress(pop: Population, gen: int) -> bool:
-    n_pareto = np.sum(pop.rank == 0)
-    best_obj = pop.objectives[pop.rank == 0].min(axis=0)
+def log_progress(result: NSGA2Result, gen: int) -> bool:
+    n_pareto = len(result.pareto_front.x)
+    best_obj = result.pareto_front.objectives.min(axis=0)
     print(f"Gen {gen}: {n_pareto} Pareto solutions, best: {best_obj}")
     return False  # Continue optimization
 
-final_pop = nsga2(..., callback=log_progress)
+result = nsga2(..., callback=log_progress)
 ```
 
 **Early stopping on convergence:**
@@ -195,8 +331,8 @@ class ConvergenceChecker:
         self.best_hypervolume = -np.inf
         self.generations_without_improvement = 0
 
-    def __call__(self, pop: Population, gen: int) -> bool:
-        hv = compute_hypervolume(pop.objectives[pop.rank == 0])
+    def __call__(self, result: NSGA2Result, gen: int) -> bool:
+        hv = compute_hypervolume(result.pareto_front.objectives)
         if hv > self.best_hypervolume + self.tol:
             self.best_hypervolume = hv
             self.generations_without_improvement = 0
@@ -206,18 +342,18 @@ class ConvergenceChecker:
         return self.generations_without_improvement >= self.patience
 
 checker = ConvergenceChecker(patience=50)
-final_pop = nsga2(..., callback=checker)
+result = nsga2(..., callback=checker)
 ```
 
 **Early stopping on target:**
 
 ```python
-def stop_on_target(pop: Population, gen: int) -> bool:
+def stop_on_target(result: NSGA2Result, gen: int) -> bool:
     # Stop when any solution achieves both objectives < 0.1
-    pareto_obj = pop.objectives[pop.rank == 0]
+    pareto_obj = result.pareto_front.objectives
     return np.any(np.all(pareto_obj < 0.1, axis=1))
 
-final_pop = nsga2(..., callback=stop_on_target)
+result = nsga2(..., callback=stop_on_target)
 ```
 
 ### Reproducibility
@@ -226,74 +362,81 @@ Use the `seed` parameter for reproducible results:
 
 ```python
 # These two runs produce identical results
-pop1 = nsga2(..., seed=42)
-pop2 = nsga2(..., seed=42)
+result1 = nsga2(..., seed=42)
+result2 = nsga2(..., seed=42)
 
-assert np.allclose(pop1.x, pop2.x)
-assert np.allclose(pop1.objectives, pop2.objectives)
+assert np.allclose(result1.population.x, result2.population.x)
+assert np.allclose(result1.population.objectives, result2.population.objectives)
 ```
 
 The seed controls:
 - Initial population generation (via `init`)
-- Parent selection (tournament selection)
+- Parent selection
 - Any randomness in crossover/mutate if they use the provided RNG
 
 ---
 
 ## Working with Results
 
-### Accessing Decision Variables and Objectives
+### NSGA-II Results
+
+**Accessing Decision Variables and Objectives:**
 
 ```python
-final_pop = nsga2(...)
+result = nsga2(...)
 
 # All solutions
-all_x = final_pop.x              # (pop_size, n_vars)
-all_obj = final_pop.objectives   # (pop_size, n_obj)
+all_x = result.population.x              # (pop_size, n_vars)
+all_obj = result.population.objectives   # (pop_size, n_obj)
 
-# Pareto-optimal solutions only
-pareto_mask = final_pop.rank == 0
-pareto_x = final_pop.x[pareto_mask]
-pareto_obj = final_pop.objectives[pareto_mask]
+# Pareto-optimal solutions using pareto_front property
+pareto_front = result.pareto_front
+pareto_x = pareto_front.x
+pareto_obj = pareto_front.objectives
+
+# Or using rank directly
+pareto_mask = result.rank == 0
+pareto_x = result.population.x[pareto_mask]
+pareto_obj = result.population.objectives[pareto_mask]
 ```
 
-### Iterating Over Solutions
+**Iterating Over Solutions:**
 
 ```python
 # Iterate using IndividualView
-for i in range(len(final_pop.x)):
-    ind = final_pop[i]
-    print(f"Solution {i}: rank={ind.rank}, obj={ind.objectives}")
+for i in range(len(result.population.x)):
+    ind = result.population[i]
+    rank = result.rank[i]
+    cd = result.crowding_distance[i]
+    print(f"Solution {i}: rank={rank}, cd={cd}, obj={ind.objectives}")
 
 # Iterate over Pareto front only
-pareto_idx = np.where(final_pop.rank == 0)[0]
-for i in pareto_idx:
-    ind = final_pop[i]
-    print(f"Pareto solution: x={ind.x}, obj={ind.objectives}")
+for i, ind in enumerate(result.pareto_front):
+    print(f"Pareto solution {i}: x={ind.x}, obj={ind.objectives}")
 ```
 
-### Filtering by Rank
+**Filtering by Rank:**
 
 ```python
 # Get solutions by front
-front_0 = final_pop.x[final_pop.rank == 0]  # Pareto optimal
-front_1 = final_pop.x[final_pop.rank == 1]  # Second front
-front_2 = final_pop.x[final_pop.rank == 2]  # Third front
+front_0 = result.population.x[result.rank == 0]  # Pareto optimal
+front_1 = result.population.x[result.rank == 1]  # Second front
+front_2 = result.population.x[result.rank == 2]  # Third front
 
 # Get all non-dominated solutions (just front 0)
-non_dominated = final_pop.x[final_pop.rank == 0]
+non_dominated = result.pareto_front.x
 
 # Get solutions within top 3 fronts
-top_3_mask = final_pop.rank <= 2
-top_3_x = final_pop.x[top_3_mask]
-top_3_obj = final_pop.objectives[top_3_mask]
+top_3_mask = result.rank <= 2
+top_3_x = result.population.x[top_3_mask]
+top_3_obj = result.population.objectives[top_3_mask]
 ```
 
-### Finding Extreme Solutions
+**Finding Extreme Solutions:**
 
 ```python
-pareto_obj = final_pop.objectives[final_pop.rank == 0]
-pareto_x = final_pop.x[final_pop.rank == 0]
+pareto_obj = result.pareto_front.objectives
+pareto_x = result.pareto_front.x
 
 # Best for objective 0
 idx_best_f0 = np.argmin(pareto_obj[:, 0])
@@ -308,6 +451,40 @@ ideal = pareto_obj.min(axis=0)
 distances = np.linalg.norm(pareto_obj - ideal, axis=1)
 idx_compromise = np.argmin(distances)
 compromise_solution = pareto_x[idx_compromise]
+```
+
+### GA Results
+
+**Accessing Best Solution:**
+
+```python
+result = ga(...)
+
+# Best individual (x, fitness)
+best_x, best_fitness = result.best
+print(f"Best solution: {best_x}")
+print(f"Best fitness: {best_fitness}")
+
+# Access full population
+all_x = result.population.x
+all_fitness = result.fitness
+
+# Find top-k solutions
+top_k = 10
+top_indices = np.argsort(result.fitness)[:top_k]
+top_x = result.population.x[top_indices]
+top_fitness = result.fitness[top_indices]
+```
+
+**Iterating Over Solutions:**
+
+```python
+# Iterate by fitness order
+sorted_indices = np.argsort(result.fitness)
+for i in sorted_indices[:10]:  # Top 10
+    ind = result.population[i]
+    fitness = result.fitness[i]
+    print(f"Solution {i}: fitness={fitness:.6f}, x={ind.x}")
 ```
 
 ---
@@ -347,7 +524,7 @@ def mutate(x: np.ndarray) -> np.ndarray:
     mutated = x + np.random.normal(0, 0.5, size=N_VARS)
     return np.clip(mutated, BOUNDS[0], BOUNDS[1])
 
-final_pop = nsga2(
+result = nsga2(
     init=init,
     evaluate=evaluate,
     crossover=crossover,
@@ -358,12 +535,12 @@ final_pop = nsga2(
 )
 
 # Filter for feasible Pareto-optimal solutions
-pareto_mask = final_pop.rank == 0
-feasible_mask = final_pop.objectives[:, 2] == 0  # No constraint violation
+pareto_mask = result.rank == 0
+feasible_mask = result.population.objectives[:, 2] == 0  # No constraint violation
 valid_mask = pareto_mask & feasible_mask
 
-feasible_pareto_x = final_pop.x[valid_mask]
-feasible_pareto_obj = final_pop.objectives[valid_mask, :2]  # Original objectives only
+feasible_pareto_x = result.population.x[valid_mask]
+feasible_pareto_obj = result.population.objectives[valid_mask, :2]  # Original objectives only
 ```
 
 ---
@@ -445,7 +622,7 @@ crossover = sbx_crossover(eta=15.0, bounds=BOUNDS, seed=100)
 mutate = polynomial_mutation(eta=20.0, bounds=BOUNDS, seed=200)
 
 # Run optimization
-final_pop = nsga2(
+result = nsga2(
     init=init,
     evaluate=evaluate,
     crossover=crossover,
@@ -456,9 +633,8 @@ final_pop = nsga2(
 )
 
 # Extract Pareto front
-pareto_mask = final_pop.rank == 0
-pareto_obj = final_pop.objectives[pareto_mask]
-print(f"Found {pareto_obj.shape[0]} Pareto-optimal solutions")
+pareto_front = result.pareto_front
+print(f"Found {len(pareto_front.x)} Pareto-optimal solutions")
 ```
 
 ### Choosing eta Values
@@ -479,3 +655,286 @@ The distribution index `eta` controls the exploration/exploitation trade-off:
 - Early exploration: `sbx_crossover(eta=5)`, `polynomial_mutation(eta=20)`
 - Balanced search: `sbx_crossover(eta=15)`, `polynomial_mutation(eta=20)`
 - Local refinement: `sbx_crossover(eta=30)`, `polynomial_mutation(eta=100)`
+
+---
+
+
+## Customizing Selection Strategies
+
+ctrl-freak provides pluggable parent selection strategies. Use string names for built-in strategies or pass custom callables.
+
+### Built-in Selection Strategies
+
+| Name | Function | Use Case |
+|------|----------|----------|
+| `'crowded'` | `crowded_tournament()` | NSGA-II (uses rank + crowding distance) |
+| `'tournament'` | `fitness_tournament()` | Standard GA (fitness-based) |
+| `'roulette'` | `roulette_wheel()` | Standard GA (fitness-proportionate) |
+
+### Using String Names
+
+```python
+# NSGA-II with default crowded tournament
+result = nsga2(..., select='crowded')
+
+# GA with roulette wheel selection
+result = ga(..., select='roulette')
+
+# GA with tournament selection (default)
+result = ga(..., select='tournament')
+```
+
+### Using Factory Functions
+
+```python
+from ctrl_freak import fitness_tournament, roulette_wheel
+
+# Tournament with larger size
+result = ga(..., select=fitness_tournament(tournament_size=5))
+
+# Roulette wheel with specific seed
+result = ga(..., select=roulette_wheel(seed=42))
+```
+
+### Custom Selection Strategy
+
+Implement the ParentSelector protocol:
+
+```python
+def my_selector(pop, n_parents, rng, **kwargs):
+    """
+    Custom parent selection strategy.
+
+    Args:
+        pop: Population to select from
+        n_parents: Number of parents to select
+        rng: Random number generator
+        **kwargs: Algorithm-specific metadata (e.g., fitness, rank, crowding_distance)
+
+    Returns:
+        np.ndarray: Indices of selected parents
+    """
+    # Your selection logic here
+    # Example: random selection
+    indices = rng.choice(len(pop.x), size=n_parents, replace=True)
+    return indices
+
+result = ga(..., select=my_selector)
+```
+
+---
+
+## Customizing Survival Strategies
+
+Survival strategies determine which individuals survive to the next generation.
+
+### Built-in Survival Strategies
+
+| Name | Function | Use Case |
+|------|----------|----------|
+| `'nsga2'` | `nsga2_survival()` | NSGA-II (Pareto ranking + crowding) |
+| `'truncation'` | `truncation_survival()` | Keep best k by fitness |
+| `'elitist'` | `elitist_survival()` | Preserve elite parents + best offspring |
+
+### Using String Names
+
+```python
+# GA with truncation (no elitism)
+result = ga(..., survive='truncation')
+
+# GA with elitist survival (default, preserves 1 elite)
+result = ga(..., survive='elitist')
+
+# NSGA-II with default NSGA-II survival
+result = nsga2(..., survive='nsga2')
+```
+
+### Using Factory Functions
+
+```python
+from ctrl_freak import elitist_survival
+
+# Elitist with 5 elites instead of 1
+result = ga(..., survive=elitist_survival(elite_count=5))
+```
+
+### Custom Survival Strategy
+
+Implement the SurvivorSelector protocol:
+
+```python
+def my_survival(pop, n_survivors, **kwargs):
+    """
+    Custom survival strategy.
+
+    Args:
+        pop: Combined parent + offspring population
+        n_survivors: Number of individuals to keep
+        **kwargs: Algorithm-specific data (e.g., fitness for GA)
+
+    Returns:
+        tuple: (survivor_indices, state_dict)
+            - survivor_indices: np.ndarray of indices to keep
+            - state_dict: dict with algorithm-specific metadata for survivors
+    """
+    # Your survival logic here
+    # Example: keep first n_survivors (not useful in practice)
+    indices = np.arange(n_survivors)
+
+    # Return indices and updated metadata
+    fitness = kwargs.get('fitness')
+    return indices, {'fitness': fitness[indices]}
+
+result = ga(..., survive=my_survival)
+```
+## Migration from Previous API
+
+### Breaking Changes in v2.0
+
+The v2.0 release introduced a new extensible framework with several breaking changes to support single-objective GA and customizable selection strategies.
+
+#### 1. Population no longer has rank/crowding_distance fields
+
+**Old API:**
+```python
+pop = nsga2(...)
+pareto_mask = pop.rank == 0
+pareto_cd = pop.crowding_distance[pareto_mask]
+```
+
+**New API:**
+```python
+result = nsga2(...)
+pareto_mask = result.rank == 0
+pareto_cd = result.crowding_distance[pareto_mask]
+```
+
+#### 2. nsga2() returns NSGA2Result, not Population
+
+**Old API:**
+```python
+pop = nsga2(...)
+all_x = pop.x
+```
+
+**New API:**
+```python
+result = nsga2(...)
+all_x = result.population.x
+```
+
+#### 3. Callback signature changed
+
+**Old API:**
+```python
+def callback(pop: Population, gen: int) -> bool:
+    n_pareto = np.sum(pop.rank == 0)
+    return False
+
+final_pop = nsga2(..., callback=callback)
+```
+
+**New API:**
+```python
+def callback(result: NSGA2Result, gen: int) -> bool:
+    n_pareto = len(result.pareto_front.x)
+    return False
+
+result = nsga2(..., callback=callback)
+```
+
+#### 4. Pareto front extraction
+
+**Old API:**
+```python
+pop = nsga2(...)
+pareto_mask = pop.rank == 0
+pareto_x = pop.x[pareto_mask]
+pareto_obj = pop.objectives[pareto_mask]
+```
+
+**New API:**
+```python
+result = nsga2(...)
+pareto_front = result.pareto_front
+pareto_x = pareto_front.x
+pareto_obj = pareto_front.objectives
+```
+
+#### 5. IndividualView no longer has rank/crowding_distance
+
+**Old API:**
+```python
+ind = pop[0]
+rank = ind.rank
+cd = ind.crowding_distance
+```
+
+**New API:**
+```python
+ind = result.population[0]
+rank = result.rank[0]
+cd = result.crowding_distance[0]
+```
+
+### Complete Migration Example
+
+**Old code:**
+```python
+from ctrl_freak import nsga2, Population
+
+def callback(pop: Population, gen: int) -> bool:
+    pareto_mask = pop.rank == 0
+    n_pareto = np.sum(pareto_mask)
+    print(f"Gen {gen}: {n_pareto} solutions")
+    return False
+
+pop = nsga2(
+    init=init,
+    evaluate=evaluate,
+    crossover=crossover,
+    mutate=mutate,
+    pop_size=100,
+    n_generations=200,
+    callback=callback,
+)
+
+pareto_mask = pop.rank == 0
+pareto_x = pop.x[pareto_mask]
+pareto_obj = pop.objectives[pareto_mask]
+best_f0 = pareto_obj[:, 0].min()
+```
+
+**New code:**
+```python
+from ctrl_freak import nsga2, NSGA2Result
+
+def callback(result: NSGA2Result, gen: int) -> bool:
+    n_pareto = len(result.pareto_front.x)
+    print(f"Gen {gen}: {n_pareto} solutions")
+    return False
+
+result = nsga2(
+    init=init,
+    evaluate=evaluate,
+    crossover=crossover,
+    mutate=mutate,
+    pop_size=100,
+    n_generations=200,
+    callback=callback,
+)
+
+pareto_front = result.pareto_front
+pareto_x = pareto_front.x
+pareto_obj = pareto_front.objectives
+best_f0 = pareto_obj[:, 0].min()
+```
+
+### New Features in v2.0
+
+1. **Single-objective GA**: Use `ga()` for standard genetic algorithms
+2. **Customizable selection**: Pass `select` parameter to choose parent selection strategy
+3. **Customizable survival**: Pass `survive` parameter to choose survival selection strategy
+4. **Result types**: Clear separation between population data and algorithm metadata
+
+---

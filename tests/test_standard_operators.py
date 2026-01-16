@@ -397,10 +397,10 @@ class TestIntegration:
             seed=42,
         )
 
-        assert result.x.shape == (20, n_vars)
-        assert result.objectives.shape == (20, 2)
-        assert np.all(result.x >= bounds[0])
-        assert np.all(result.x <= bounds[1])
+        assert result.population.x.shape == (20, n_vars)
+        assert result.population.objectives.shape == (20, 2)
+        assert np.all(result.population.x >= bounds[0])
+        assert np.all(result.population.x <= bounds[1])
 
     def test_polynomial_mutation_compatible_with_nsga2(self) -> None:
         """Polynomial mutation should work with nsga2."""
@@ -430,10 +430,10 @@ class TestIntegration:
             seed=42,
         )
 
-        assert result.x.shape == (20, n_vars)
-        assert result.objectives.shape == (20, 2)
-        assert np.all(result.x >= bounds[0])
-        assert np.all(result.x <= bounds[1])
+        assert result.population.x.shape == (20, n_vars)
+        assert result.population.objectives.shape == (20, 2)
+        assert np.all(result.population.x >= bounds[0])
+        assert np.all(result.population.x <= bounds[1])
 
     def test_both_operators_together(self) -> None:
         """Both standard operators should work together in nsga2."""
@@ -466,10 +466,13 @@ class TestIntegration:
         )
 
         # Check basic properties
-        assert result.x.shape == (50, n_vars)
-        assert result.objectives.shape == (50, 2)
-        assert np.all(result.x >= bounds[0])
-        assert np.all(result.x <= bounds[1])
+        assert result.population.x.shape == (50, n_vars)
+        assert result.population.objectives.shape == (50, 2)
+        assert np.all(result.population.x >= bounds[0])
+        assert np.all(result.population.x <= bounds[1])
 
         # Should have some Pareto-optimal solutions
-        assert np.sum(result.rank == 0) > 0
+        from ctrl_freak import non_dominated_sort
+
+        ranks = non_dominated_sort(result.population.objectives)
+        assert np.sum(ranks == 0) > 0
