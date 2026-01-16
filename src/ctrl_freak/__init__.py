@@ -23,6 +23,12 @@ from ctrl_freak.primitives import (
     dominates_matrix,
     non_dominated_sort,
 )
+from ctrl_freak.registry import (
+    SelectionRegistry,
+    SurvivalRegistry,
+    list_selections,
+    list_survivals,
+)
 from ctrl_freak.standard_operators import polynomial_mutation, sbx_crossover
 
 __all__ = [
@@ -38,6 +44,11 @@ __all__ = [
     "dominates_matrix",
     "non_dominated_sort",
     "crowding_distance",
+    # Registry system
+    "SelectionRegistry",
+    "SurvivalRegistry",
+    "list_selections",
+    "list_survivals",
     # Standard operators
     "sbx_crossover",
     "polynomial_mutation",
