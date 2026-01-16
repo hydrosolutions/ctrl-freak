@@ -5,7 +5,7 @@ import pytest
 
 from ctrl_freak.population import Population
 from ctrl_freak.registry import SurvivalRegistry
-from ctrl_freak.survival import nsga2_survival, truncation_survival
+from ctrl_freak.survival import elitist_survival, nsga2_survival, truncation_survival
 
 
 class TestNSGA2Survival:
@@ -709,3 +709,424 @@ class TestTruncationSurvival:
 
         # All fitness values should be 2.0
         np.testing.assert_array_equal(state["fitness"], [2.0, 2.0])
+
+
+class TestElitistSurvival:
+    """Tests for elitist survival selection."""
+
+    def test_returns_correct_number_of_survivors(self):
+        """Test that elitist survival returns the requested number of survivors."""
+        # Combined population: 4 parents + 4 offspring
+        x = np.random.randn(8, 2)
+        objectives = np.array(
+            [[4.0], [2.0], [3.0], [1.0], [0.5], [1.5], [2.5], [3.5]]  # parents  # offspring
+        )
+        pop = Population(x=x, objectives=objectives)
+
+        selector = elitist_survival(elite_count=2)
+        indices, state = selector(pop, n_survivors=4, parent_size=4)
+
+        assert indices.shape == (4,)
+        assert indices.dtype == np.intp
+        assert np.all(indices >= 0)
+        assert np.all(indices < len(pop))
+        # Check that all indices are unique
+        assert len(np.unique(indices)) == 4
+
+    def test_returns_state_with_fitness(self):
+        """Test that elitist survival returns state dict with fitness key."""
+        x = np.random.randn(6, 2)
+        objectives = np.array([[3.0], [1.0], [2.0], [0.5], [1.5], [2.5]])  # 3 parents, 3 offspring
+        pop = Population(x=x, objectives=objectives)
+
+        selector = elitist_survival(elite_count=1)
+        n_survivors = 3
+
+        indices, state = selector(pop, n_survivors, parent_size=3)
+
+        # Check state dictionary has fitness key
+        assert "fitness" in state
+
+        # Check shape matches n_survivors
+        assert state["fitness"].shape == (n_survivors,)
+
+        # Check dtype
+        assert state["fitness"].dtype in [np.float64, np.float32]
+
+    def test_preserves_elite_parents(self):
+        """Test that elite parents are always preserved."""
+        x = np.arange(8).reshape(8, 1).astype(float)
+        # Parents (indices 0-3): fitness [4.0, 2.0, 3.0, 1.0]
+        # Best parents: idx 3 (1.0), idx 1 (2.0)
+        # Offspring (indices 4-7): fitness [0.5, 1.5, 2.5, 3.5]
+        objectives = np.array([[4.0], [2.0], [3.0], [1.0], [0.5], [1.5], [2.5], [3.5]])
+        pop = Population(x=x, objectives=objectives)
+
+        selector = elitist_survival(elite_count=2)
+        indices, state = selector(pop, n_survivors=4, parent_size=4)
+
+        # Should include 2 best parents (indices 3 and 1)
+        assert 3 in indices  # best parent with fitness 1.0
+        assert 1 in indices  # second best parent with fitness 2.0
+
+    def test_fills_remaining_slots_from_offspring(self):
+        """Test that remaining slots are filled with best offspring."""
+        x = np.arange(8).reshape(8, 1).astype(float)
+        # Parents (indices 0-3): fitness [4.0, 2.0, 3.0, 1.0]
+        # Offspring (indices 4-7): fitness [0.5, 1.5, 2.5, 3.5]
+        # Best offspring: idx 4 (0.5), idx 5 (1.5)
+        objectives = np.array([[4.0], [2.0], [3.0], [1.0], [0.5], [1.5], [2.5], [3.5]])
+        pop = Population(x=x, objectives=objectives)
+
+        selector = elitist_survival(elite_count=1)
+        indices, state = selector(pop, n_survivors=3, parent_size=4)
+
+        # Should have 1 elite parent + 2 best offspring
+        # Elite: idx 3 (fitness 1.0)
+        # Best offspring: idx 4 (0.5), idx 5 (1.5)
+        assert 3 in indices
+        assert 4 in indices
+        assert 5 in indices
+        assert len(indices) == 3
+
+    def test_correct_fitness_values_in_state(self):
+        """Test that state contains correct fitness values for survivors."""
+        x = np.arange(6).reshape(6, 1).astype(float)
+        # Parents: [3.0, 1.0, 2.0]
+        # Offspring: [0.5, 1.5, 2.5]
+        objectives = np.array([[3.0], [1.0], [2.0], [0.5], [1.5], [2.5]])
+        pop = Population(x=x, objectives=objectives)
+
+        selector = elitist_survival(elite_count=1)
+        indices, state = selector(pop, n_survivors=3, parent_size=3)
+
+        # Elite: idx 1 (1.0)
+        # Best offspring: idx 3 (0.5), idx 4 (1.5)
+        survivor_fitness = state["fitness"]
+
+        # Check that we have the right fitness values (order may vary)
+        expected_fitness = sorted([1.0, 0.5, 1.5])
+        actual_fitness = sorted(survivor_fitness.tolist())
+        np.testing.assert_array_almost_equal(actual_fitness, expected_fitness)
+
+    def test_deterministic_output(self):
+        """Test that elitist survival produces deterministic output."""
+        x = np.random.randn(8, 2)
+        objectives = np.array([[4.0], [2.0], [3.0], [1.0], [0.5], [1.5], [2.5], [3.5]])
+        pop = Population(x=x, objectives=objectives)
+
+        selector = elitist_survival(elite_count=2)
+
+        # Run twice
+        indices1, state1 = selector(pop, n_survivors=4, parent_size=4)
+        indices2, state2 = selector(pop, n_survivors=4, parent_size=4)
+
+        # Results should be identical
+        np.testing.assert_array_equal(indices1, indices2)
+        np.testing.assert_array_equal(state1["fitness"], state2["fitness"])
+
+    def test_error_when_no_parent_size_kwarg(self):
+        """Test that ValueError is raised when parent_size kwarg is missing."""
+        x = np.array([[1.0], [2.0]])
+        objectives = np.array([[1.0], [2.0]])
+        pop = Population(x=x, objectives=objectives)
+
+        selector = elitist_survival(elite_count=1)
+
+        with pytest.raises(ValueError, match="elitist survival requires 'parent_size' kwarg"):
+            selector(pop, n_survivors=1)
+
+    def test_error_when_elite_count_exceeds_parent_size(self):
+        """Test that ValueError is raised when elite_count > parent_size."""
+        x = np.array([[1.0], [2.0], [3.0], [4.0]])
+        objectives = np.array([[1.0], [2.0], [3.0], [4.0]])
+        pop = Population(x=x, objectives=objectives)
+
+        selector = elitist_survival(elite_count=3)
+
+        with pytest.raises(ValueError, match="elite_count .* cannot exceed parent_size"):
+            selector(pop, n_survivors=3, parent_size=2)
+
+    def test_error_when_elite_count_exceeds_n_survivors(self):
+        """Test that ValueError is raised when elite_count > n_survivors."""
+        x = np.array([[1.0], [2.0], [3.0], [4.0]])
+        objectives = np.array([[1.0], [2.0], [3.0], [4.0]])
+        pop = Population(x=x, objectives=objectives)
+
+        selector = elitist_survival(elite_count=3)
+
+        with pytest.raises(ValueError, match="elite_count .* cannot exceed n_survivors"):
+            selector(pop, n_survivors=2, parent_size=4)
+
+    def test_error_when_invalid_elite_count_at_creation(self):
+        """Test that ValueError is raised when creating selector with invalid elite_count."""
+        with pytest.raises(ValueError, match="elite_count must be positive"):
+            elitist_survival(elite_count=0)
+
+        with pytest.raises(ValueError, match="elite_count must be positive"):
+            elitist_survival(elite_count=-1)
+
+    def test_error_when_n_survivors_is_zero(self):
+        """Test that ValueError is raised when n_survivors is zero."""
+        x = np.array([[1.0], [2.0]])
+        objectives = np.array([[1.0], [2.0]])
+        pop = Population(x=x, objectives=objectives)
+
+        selector = elitist_survival(elite_count=1)
+
+        with pytest.raises(ValueError, match="n_survivors must be positive"):
+            selector(pop, n_survivors=0, parent_size=1)
+
+    def test_error_when_n_survivors_is_negative(self):
+        """Test that ValueError is raised when n_survivors is negative."""
+        x = np.array([[1.0], [2.0]])
+        objectives = np.array([[1.0], [2.0]])
+        pop = Population(x=x, objectives=objectives)
+
+        selector = elitist_survival(elite_count=1)
+
+        with pytest.raises(ValueError, match="n_survivors must be positive"):
+            selector(pop, n_survivors=-1, parent_size=1)
+
+    def test_error_when_n_survivors_exceeds_population_size(self):
+        """Test that ValueError is raised when n_survivors exceeds population size."""
+        x = np.array([[1.0], [2.0], [3.0]])
+        objectives = np.array([[1.0], [2.0], [3.0]])
+        pop = Population(x=x, objectives=objectives)
+
+        selector = elitist_survival(elite_count=1)
+        pop_size = len(pop)
+
+        with pytest.raises(ValueError, match="n_survivors .* cannot exceed population size"):
+            selector(pop, n_survivors=pop_size + 1, parent_size=2)
+
+    def test_error_when_no_objectives_and_no_fitness_kwarg(self):
+        """Test that ValueError is raised when population has no objectives and no fitness kwarg."""
+        x = np.array([[1.0, 2.0], [3.0, 4.0]])
+        pop = Population(x=x, objectives=None)
+
+        selector = elitist_survival(elite_count=1)
+
+        with pytest.raises(ValueError, match="Population must have objectives computed"):
+            selector(pop, n_survivors=1, parent_size=1)
+
+    def test_error_when_multi_objective_without_fitness_kwarg(self):
+        """Test that ValueError is raised for multi-objective without explicit fitness."""
+        x = np.array([[1.0], [2.0], [3.0]])
+        objectives = np.array([[1.0, 2.0], [2.0, 1.0], [1.5, 1.5]])
+        pop = Population(x=x, objectives=objectives)
+
+        selector = elitist_survival(elite_count=1)
+
+        with pytest.raises(
+            ValueError,
+            match="elitist survival requires single-objective optimization.*Pass explicit 'fitness'",
+        ):
+            selector(pop, n_survivors=2, parent_size=2)
+
+    def test_works_with_explicit_fitness_kwarg(self):
+        """Test that elitist survival works with explicit fitness kwarg for multi-objective."""
+        x = np.arange(6).reshape(6, 1).astype(float)
+        objectives = np.array([[1.0, 4.0], [2.0, 3.0], [3.0, 2.0], [4.0, 1.0], [0.5, 0.5], [1.5, 1.5]])
+        # Custom fitness: sum of objectives
+        custom_fitness = np.array([5.0, 5.0, 5.0, 5.0, 1.0, 3.0])
+        pop = Population(x=x, objectives=objectives)
+
+        selector = elitist_survival(elite_count=1)
+
+        # Parents (0-3), offspring (4-5)
+        # Best parent by custom fitness: idx 0 or 1 or 2 or 3 (all 5.0, stable sort picks 0)
+        # Best offspring: idx 4 (1.0), idx 5 (3.0)
+        indices, state = selector(pop, n_survivors=3, parent_size=4, fitness=custom_fitness)
+
+        assert len(indices) == 3
+        # Elite parent (first with fitness 5.0 due to stable sort)
+        assert 0 in indices
+        # Best offspring
+        assert 4 in indices
+        assert 5 in indices
+
+    def test_elite_count_equals_n_survivors(self):
+        """Test edge case where elite_count equals n_survivors (only elites survive)."""
+        x = np.arange(6).reshape(6, 1).astype(float)
+        objectives = np.array([[4.0], [2.0], [3.0], [1.0], [0.5], [1.5]])
+        pop = Population(x=x, objectives=objectives)
+
+        selector = elitist_survival(elite_count=3)
+        indices, state = selector(pop, n_survivors=3, parent_size=4)
+
+        # Should select only the 3 best parents
+        # Best parents: idx 3 (1.0), idx 1 (2.0), idx 2 (3.0)
+        assert len(indices) == 3
+        assert 3 in indices
+        assert 1 in indices
+        assert 2 in indices
+
+        # No offspring should be selected
+        assert all(idx < 4 for idx in indices)
+
+    def test_single_elite_with_many_offspring(self):
+        """Test with single elite and multiple offspring slots."""
+        x = np.arange(10).reshape(10, 1).astype(float)
+        # Parents: [5.0, 3.0, 4.0]
+        # Offspring: [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7]
+        objectives = np.array(
+            [[5.0], [3.0], [4.0], [0.1], [0.2], [0.3], [0.4], [0.5], [0.6], [0.7]]
+        )
+        pop = Population(x=x, objectives=objectives)
+
+        selector = elitist_survival(elite_count=1)
+        indices, state = selector(pop, n_survivors=5, parent_size=3)
+
+        # Should have 1 elite (idx 1 with fitness 3.0) + 4 best offspring
+        assert len(indices) == 5
+        assert 1 in indices  # best parent
+
+        # Best 4 offspring: indices 3, 4, 5, 6
+        assert 3 in indices
+        assert 4 in indices
+        assert 5 in indices
+        assert 6 in indices
+
+    def test_ties_in_parents_handled_deterministically(self):
+        """Test that ties in parent fitness are handled deterministically."""
+        x = np.arange(8).reshape(8, 1).astype(float)
+        # Parents: [2.0, 2.0, 2.0, 1.0]
+        # Offspring: [0.5, 1.5, 2.5, 3.5]
+        objectives = np.array([[2.0], [2.0], [2.0], [1.0], [0.5], [1.5], [2.5], [3.5]])
+        pop = Population(x=x, objectives=objectives)
+
+        selector = elitist_survival(elite_count=2)
+
+        # Run twice
+        indices1, _ = selector(pop, n_survivors=3, parent_size=4)
+        indices2, _ = selector(pop, n_survivors=3, parent_size=4)
+
+        # Should be deterministic
+        np.testing.assert_array_equal(indices1, indices2)
+
+        # Best parent: idx 3 (1.0)
+        # Second best: idx 0 (2.0, due to stable sort)
+        assert 3 in indices1
+        assert 0 in indices1
+
+    def test_ties_in_offspring_handled_deterministically(self):
+        """Test that ties in offspring fitness are handled deterministically."""
+        x = np.arange(8).reshape(8, 1).astype(float)
+        # Parents: [3.0, 2.0, 4.0, 1.0]
+        # Offspring: [2.0, 2.0, 2.0, 3.0]
+        objectives = np.array([[3.0], [2.0], [4.0], [1.0], [2.0], [2.0], [2.0], [3.0]])
+        pop = Population(x=x, objectives=objectives)
+
+        selector = elitist_survival(elite_count=1)
+
+        # Run twice
+        indices1, _ = selector(pop, n_survivors=3, parent_size=4)
+        indices2, _ = selector(pop, n_survivors=3, parent_size=4)
+
+        # Should be deterministic
+        np.testing.assert_array_equal(indices1, indices2)
+
+        # Elite: idx 3 (1.0)
+        # Best offspring: idx 4, 5 (both 2.0, stable sort picks first two)
+        assert 3 in indices1
+        assert 4 in indices1
+        assert 5 in indices1
+
+    def test_registration_in_survival_registry(self):
+        """Test that 'elitist' is registered in SurvivalRegistry."""
+        # Force re-registration by reloading the module
+        import importlib
+
+        import ctrl_freak.survival
+
+        importlib.reload(ctrl_freak.survival)
+
+        assert "elitist" in SurvivalRegistry.list()
+
+        # Get a configured selector from registry (registry calls factory with kwargs)
+        selector = SurvivalRegistry.get("elitist", elite_count=1)
+
+        # Verify it's callable (selector function returned by factory)
+        assert callable(selector)
+
+        # Test that it works
+        x = np.array([[1.0], [2.0], [3.0], [4.0], [5.0], [6.0]])
+        objectives = np.array([[3.0], [1.0], [2.0], [0.5], [1.5], [2.5]])
+        pop = Population(x=x, objectives=objectives)
+
+        indices, state = selector(pop, n_survivors=3, parent_size=3)
+        assert len(indices) == 3
+        assert "fitness" in state
+
+    def test_all_survivors_are_parents_when_no_offspring_needed(self):
+        """Test selecting all from parents when offspring slots are zero."""
+        x = np.arange(6).reshape(6, 1).astype(float)
+        # Parents: [4.0, 2.0, 3.0, 1.0]
+        # Offspring: [0.5, 1.5]
+        objectives = np.array([[4.0], [2.0], [3.0], [1.0], [0.5], [1.5]])
+        pop = Population(x=x, objectives=objectives)
+
+        selector = elitist_survival(elite_count=4)
+        indices, state = selector(pop, n_survivors=4, parent_size=4)
+
+        # All survivors should be parents
+        assert len(indices) == 4
+        assert all(idx < 4 for idx in indices)
+
+        # Should be the 4 best parents in order
+        assert 3 in indices  # fitness 1.0
+        assert 1 in indices  # fitness 2.0
+        assert 2 in indices  # fitness 3.0
+        assert 0 in indices  # fitness 4.0
+
+    def test_single_offspring_slot(self):
+        """Test with only one offspring slot to fill."""
+        x = np.arange(6).reshape(6, 1).astype(float)
+        objectives = np.array([[4.0], [2.0], [3.0], [0.5], [1.5], [2.5]])
+        pop = Population(x=x, objectives=objectives)
+
+        selector = elitist_survival(elite_count=2)
+        indices, state = selector(pop, n_survivors=3, parent_size=3)
+
+        # 2 elites from parents + 1 best offspring
+        assert len(indices) == 3
+        # Best parents: idx 1 (2.0), idx 2 (3.0)
+        assert 1 in indices
+        assert 2 in indices
+        # Best offspring: idx 3 (0.5)
+        assert 3 in indices
+
+    def test_large_population_selection(self):
+        """Test elitist survival with larger population."""
+        n_parents = 50
+        n_offspring = 50
+        n_pop = n_parents + n_offspring
+
+        x = np.arange(n_pop).reshape(n_pop, 1).astype(float)
+        rng = np.random.default_rng(42)
+        parent_objectives = rng.uniform(1, 10, size=(n_parents, 1))
+        offspring_objectives = rng.uniform(0, 5, size=(n_offspring, 1))
+        objectives = np.vstack([parent_objectives, offspring_objectives])
+        pop = Population(x=x, objectives=objectives)
+
+        selector = elitist_survival(elite_count=10)
+        n_survivors = 50
+
+        indices, state = selector(pop, n_survivors, parent_size=n_parents)
+
+        # Should return correct number of survivors
+        assert len(indices) == n_survivors
+        assert len(np.unique(indices)) == n_survivors
+
+        # State should have correct shape
+        assert state["fitness"].shape == (n_survivors,)
+
+        # Should have 10 elites from parents
+        parent_indices = indices[indices < n_parents]
+        assert len(parent_indices) >= 10  # At least 10 parents
+
+        # Check that 10 best parents are included
+        best_parent_indices = np.argsort(objectives[:n_parents, 0])[:10]
+        for idx in best_parent_indices:
+            assert idx in indices
