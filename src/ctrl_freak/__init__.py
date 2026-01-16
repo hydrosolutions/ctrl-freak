@@ -14,7 +14,8 @@ Example:
     10
 """
 
-from ctrl_freak.algorithm import nsga2, survivor_selection
+from ctrl_freak.algorithm import survivor_selection
+from ctrl_freak.algorithms import nsga2
 from ctrl_freak.operators import create_offspring, lift, polynomial_mutation, sbx_crossover, select_parents
 from ctrl_freak.population import IndividualView, Population
 from ctrl_freak.primitives import (

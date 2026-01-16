@@ -11,6 +11,7 @@ import numpy as np
 import pytest
 
 from ctrl_freak import (
+    NSGA2Result,
     Population,
     crowding_distance,
     non_dominated_sort,
@@ -142,7 +143,7 @@ class TestNSGA2Integration:
     """Integration tests for the nsga2 main loop."""
 
     def test_returns_population(self, simple_biobj_problem: dict) -> None:
-        """nsga2 returns a Population instance."""
+        """nsga2 returns a NSGA2Result instance."""
         result = nsga2(
             init=simple_biobj_problem["init"],
             evaluate=simple_biobj_problem["evaluate"],
@@ -152,7 +153,8 @@ class TestNSGA2Integration:
             n_generations=5,
             seed=42,
         )
-        assert isinstance(result, Population)
+        assert isinstance(result, NSGA2Result)
+        assert isinstance(result.population, Population)
 
     def test_returns_correct_size(self, simple_biobj_problem: dict) -> None:
         """Result population has exactly pop_size individuals."""
@@ -166,7 +168,7 @@ class TestNSGA2Integration:
             n_generations=5,
             seed=42,
         )
-        assert len(result) == pop_size
+        assert len(result.population) == pop_size
 
     def test_has_objectives_computed(self, simple_biobj_problem: dict) -> None:
         """Result population has objectives array."""
@@ -179,9 +181,9 @@ class TestNSGA2Integration:
             n_generations=5,
             seed=42,
         )
-        assert result.objectives is not None
-        assert result.objectives.shape[0] == 10
-        assert result.objectives.shape[1] == 2  # bi-objective
+        assert result.population.objectives is not None
+        assert result.population.objectives.shape[0] == 10
+        assert result.population.objectives.shape[1] == 2  # bi-objective
 
     def test_deterministic_with_seed(self, simple_biobj_problem: dict) -> None:
         """Same seed produces identical results when operators are deterministic.
@@ -207,8 +209,8 @@ class TestNSGA2Integration:
         result1 = nsga2(**kwargs)
         result2 = nsga2(**kwargs)
 
-        np.testing.assert_array_equal(result1.x, result2.x)
-        np.testing.assert_array_equal(result1.objectives, result2.objectives)
+        np.testing.assert_array_equal(result1.population.x, result2.population.x)
+        np.testing.assert_array_equal(result1.population.objectives, result2.population.objectives)
 
     def test_different_seeds_produce_different_results(self, simple_biobj_problem: dict) -> None:
         """Different seeds produce different results."""
@@ -225,7 +227,7 @@ class TestNSGA2Integration:
         result2 = nsga2(**common_kwargs, seed=2)
 
         # Very unlikely to be identical with different seeds
-        assert not np.allclose(result1.x, result2.x)
+        assert not np.allclose(result1.population.x, result2.population.x)
 
     def test_improves_over_generations_zdt1(self, zdt1_problem: dict) -> None:
         """Optimization improves (or maintains) hypervolume over generations."""
@@ -253,11 +255,11 @@ class TestNSGA2Integration:
 
         # Compare using simple dominated hypervolume proxy:
         # Sum of objective values for Pareto front (lower is better for minimization)
-        initial_ranks = non_dominated_sort(initial_result.objectives)
-        final_ranks = non_dominated_sort(final_result.objectives)
+        initial_ranks = non_dominated_sort(initial_result.population.objectives)
+        final_ranks = non_dominated_sort(final_result.population.objectives)
 
-        initial_front = initial_result.objectives[initial_ranks == 0]
-        final_front = final_result.objectives[final_ranks == 0]
+        initial_front = initial_result.population.objectives[initial_ranks == 0]
+        final_front = final_result.population.objectives[final_ranks == 0]
 
         # Mean objective value should decrease (improvement)
         initial_mean = initial_front.mean()
@@ -276,8 +278,8 @@ class TestNSGA2Integration:
             n_generations=0,
             seed=42,
         )
-        assert len(result) == 10
-        assert result.objectives is not None
+        assert len(result.population) == 10
+        assert result.population.objectives is not None
 
     def test_raises_on_invalid_pop_size(self, simple_biobj_problem: dict) -> None:
         """Raises ValueError for non-positive pop_size."""
@@ -315,11 +317,11 @@ class TestNSGA2Callback:
     """Tests for the callback functionality in nsga2."""
 
     def test_callback_receives_population_and_generation(self, simple_biobj_problem: dict) -> None:
-        """Callback receives (Population, int) arguments."""
-        received_args: list[tuple[Population, int]] = []
+        """Callback receives (NSGA2Result, int) arguments."""
+        received_args: list[tuple[NSGA2Result, int]] = []
 
-        def callback(pop: Population, gen: int) -> bool:
-            received_args.append((pop, gen))
+        def callback(result: NSGA2Result, gen: int) -> bool:
+            received_args.append((result, gen))
             return False
 
         nsga2(
@@ -334,15 +336,15 @@ class TestNSGA2Callback:
         )
 
         assert len(received_args) == 3
-        for i, (pop, gen) in enumerate(received_args):
-            assert isinstance(pop, Population)
+        for i, (result, gen) in enumerate(received_args):
+            assert isinstance(result, NSGA2Result)
             assert gen == i
 
     def test_callback_can_stop_early(self, simple_biobj_problem: dict) -> None:
         """Returning True from callback stops optimization early."""
         call_count = 0
 
-        def callback(pop: Population, gen: int) -> bool:
+        def callback(result: NSGA2Result, gen: int) -> bool:
             nonlocal call_count
             call_count += 1
             return gen >= 1  # Stop after generation 1
@@ -364,7 +366,7 @@ class TestNSGA2Callback:
         """Callback is not called when n_generations=0."""
         call_count = 0
 
-        def callback(pop: Population, gen: int) -> bool:
+        def callback(result: NSGA2Result, gen: int) -> bool:
             nonlocal call_count
             call_count += 1
             return False
@@ -383,11 +385,11 @@ class TestNSGA2Callback:
         assert call_count == 0
 
     def test_callback_receives_current_population_state(self, simple_biobj_problem: dict) -> None:
-        """Each callback receives the current generation's population."""
-        populations: list[Population] = []
+        """Each callback receives the current generation's result."""
+        results: list[NSGA2Result] = []
 
-        def callback(pop: Population, gen: int) -> bool:
-            populations.append(pop)
+        def callback(result: NSGA2Result, gen: int) -> bool:
+            results.append(result)
             return False
 
         nsga2(
@@ -401,9 +403,9 @@ class TestNSGA2Callback:
             callback=callback,
         )
 
-        # Each population should have objectives
-        for pop in populations:
-            assert pop.objectives is not None
+        # Each result's population should have objectives
+        for result in results:
+            assert result.population.objectives is not None
 
 
 # =============================================================================
@@ -426,8 +428,8 @@ class TestPropertyBased:
             seed=42,
         )
 
-        ranks = non_dominated_sort(result.objectives)
-        pareto_front = result.objectives[ranks == 0]
+        ranks = non_dominated_sort(result.population.objectives)
+        pareto_front = result.population.objectives[ranks == 0]
 
         # Check that no solution in the front dominates another
         for i in range(len(pareto_front)):
@@ -453,8 +455,8 @@ class TestPropertyBased:
         )
 
         # Compute crowding distance for the result
-        ranks = non_dominated_sort(result.objectives)
-        cd = _compute_crowding_for_all_fronts(result.objectives, ranks)
+        ranks = non_dominated_sort(result.population.objectives)
+        cd = _compute_crowding_for_all_fronts(result.population.objectives, ranks)
         assert np.all(cd >= 0)
 
     def test_ranks_are_contiguous(self, zdt1_problem: dict) -> None:
@@ -469,18 +471,18 @@ class TestPropertyBased:
             seed=42,
         )
 
-        ranks = non_dominated_sort(result.objectives)
+        ranks = non_dominated_sort(result.population.objectives)
         unique_ranks = np.unique(ranks)
         expected_ranks = np.arange(unique_ranks.max() + 1)
         np.testing.assert_array_equal(unique_ranks, expected_ranks)
 
     def test_population_size_invariant(self, zdt1_problem: dict) -> None:
         """Population size remains constant throughout optimization."""
-        pop_size = 15
+        pop_size = 16  # Must be even for new nsga2 implementation
         sizes: list[int] = []
 
-        def callback(pop: Population, gen: int) -> bool:
-            sizes.append(len(pop))
+        def callback(result: NSGA2Result, gen: int) -> bool:
+            sizes.append(len(result.population))
             return False
 
         result = nsga2(
@@ -494,7 +496,7 @@ class TestPropertyBased:
             callback=callback,
         )
 
-        assert len(result) == pop_size
+        assert len(result.population) == pop_size
         assert all(s == pop_size for s in sizes)
 
     def test_objectives_correspond_to_x(self, simple_biobj_problem: dict) -> None:
@@ -510,9 +512,9 @@ class TestPropertyBased:
         )
 
         # Re-evaluate and compare
-        for i in range(len(result)):
-            expected_obj = simple_biobj_problem["evaluate"](result.x[i])
-            np.testing.assert_allclose(result.objectives[i], expected_obj)
+        for i in range(len(result.population)):
+            expected_obj = simple_biobj_problem["evaluate"](result.population.x[i])
+            np.testing.assert_allclose(result.population.objectives[i], expected_obj)
 
     def test_boundary_solutions_have_inf_crowding(self, zdt1_problem: dict) -> None:
         """In each front with 3+ individuals, boundary solutions have inf crowding."""
@@ -526,13 +528,13 @@ class TestPropertyBased:
             seed=42,
         )
 
-        ranks = non_dominated_sort(result.objectives)
-        cd = _compute_crowding_for_all_fronts(result.objectives, ranks)
+        ranks = non_dominated_sort(result.population.objectives)
+        cd = _compute_crowding_for_all_fronts(result.population.objectives, ranks)
 
         # Check each front
         for r in range(int(ranks.max()) + 1):
             mask = ranks == r
-            front_obj = result.objectives[mask]
+            front_obj = result.population.objectives[mask]
             front_cd = cd[mask]
 
             if len(front_cd) >= 3:
@@ -548,40 +550,6 @@ class TestPropertyBased:
 
 class TestEdgeCases:
     """Tests for edge cases and boundary conditions."""
-
-    def test_single_individual_population(self) -> None:
-        """Handles population of size 1."""
-
-        def init(rng: np.random.Generator) -> np.ndarray:
-            return rng.uniform(0, 1, size=3)
-
-        def evaluate(x: np.ndarray) -> np.ndarray:
-            return np.array([x.sum(), (1 - x).sum()])
-
-        def crossover(p1: np.ndarray, p2: np.ndarray) -> np.ndarray:
-            return (p1 + p2) / 2
-
-        def mutate(x: np.ndarray) -> np.ndarray:
-            return x.copy()
-
-        result = nsga2(
-            init=init,
-            evaluate=evaluate,
-            crossover=crossover,
-            mutate=mutate,
-            pop_size=1,
-            n_generations=3,
-            seed=42,
-        )
-
-        assert len(result) == 1
-
-        # Compute rank and crowding to verify properties
-        ranks = non_dominated_sort(result.objectives)
-        cd = _compute_crowding_for_all_fronts(result.objectives, ranks)
-
-        assert ranks[0] == 0  # Single individual is always rank 0
-        assert np.isinf(cd[0])  # Single individual has inf crowding
 
     def test_two_individual_population(self) -> None:
         """Handles population of size 2."""
@@ -608,11 +576,11 @@ class TestEdgeCases:
             seed=42,
         )
 
-        assert len(result) == 2
+        assert len(result.population) == 2
 
         # Compute crowding distance
-        ranks = non_dominated_sort(result.objectives)
-        cd = _compute_crowding_for_all_fronts(result.objectives, ranks)
+        ranks = non_dominated_sort(result.population.objectives)
+        cd = _compute_crowding_for_all_fronts(result.population.objectives, ranks)
 
         # With 2 individuals in a front, both should have inf crowding
         assert np.all(np.isinf(cd))
@@ -642,8 +610,8 @@ class TestEdgeCases:
             seed=42,
         )
 
-        assert len(result) == 10
-        assert result.objectives.shape[1] == 1
+        assert len(result.population) == 10
+        assert result.population.objectives.shape[1] == 1
 
     def test_many_objectives(self) -> None:
         """Algorithm works with many objectives (5+)."""
@@ -673,8 +641,8 @@ class TestEdgeCases:
             seed=42,
         )
 
-        assert len(result) == 20
-        assert result.objectives.shape[1] == n_obj
+        assert len(result.population) == 20
+        assert result.population.objectives.shape[1] == n_obj
 
     def test_high_dimensional_decision_space(self) -> None:
         """Algorithm works with high-dimensional decision variables."""
@@ -702,5 +670,5 @@ class TestEdgeCases:
             seed=42,
         )
 
-        assert len(result) == 10
-        assert result.x.shape[1] == n_vars
+        assert len(result.population) == 10
+        assert result.population.x.shape[1] == n_vars

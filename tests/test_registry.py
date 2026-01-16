@@ -20,14 +20,18 @@ from ctrl_freak.registry import (
 
 
 @pytest.fixture(autouse=True)
-def clear_registries():
-    """Clear registries before each test to ensure isolation."""
+def isolate_registries():
+    """Save and restore registries to ensure test isolation."""
+    # Save current state
+    saved_selection = SelectionRegistry._registry.copy()
+    saved_survival = SurvivalRegistry._registry.copy()
+    # Clear for fresh test
     SelectionRegistry._registry = {}
     SurvivalRegistry._registry = {}
     yield
-    # Clean up after test
-    SelectionRegistry._registry = {}
-    SurvivalRegistry._registry = {}
+    # Restore original state
+    SelectionRegistry._registry = saved_selection
+    SurvivalRegistry._registry = saved_survival
 
 
 class TestSelectionRegistry:
