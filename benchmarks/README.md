@@ -69,7 +69,7 @@ All libraries configured with identical parameters:
 
 ### Visual Comparison
 
-<img src="zdt/results/zdt3_pareto_comparison.png" alt="ZDT3 Pareto Front Comparison" width="50%">
+<img src="zdt/results/zdt3_pareto_comparison.png" alt="ZDT3 Pareto Front Comparison" width="100%">
 
 *ZDT3 discontinuous Pareto front: ctrl-freak and DEAP closely track the true front, while Pymoo shows visible scatter.*
 

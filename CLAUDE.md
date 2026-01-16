@@ -263,3 +263,45 @@ All experiments are defined using YAML configuration files:
 * `data_preparation`: Mode (simulation vs forecast), autoregressive settings
 * `model`: Architecture type and hyperparameters
 * `dataloader`: Batch size, number of workers, etc.
+
+## Ralph - Autonomous AI Agent Loop
+
+### Overview
+
+Ralph is an autonomous AI agent loop that runs Claude Code repeatedly until all PRD items are complete. Each iteration is a fresh Claude Code instance with clean context.
+
+### Commands
+
+```bash
+# Run Ralph with a specific PRD
+./ralph.sh tasks/prd-feature.json
+
+# Run with custom max iterations
+./ralph.sh tasks/prd-feature.json 20
+```
+
+### Slash Commands
+
+* `/prd` - Generate a Product Requirements Document
+* `/ralph` - Convert PRD markdown to JSON format
+
+### Key Files
+
+* `ralph.sh` - The bash loop that spawns fresh Claude Code instances
+* `prompt.md` - Instructions given to each Claude Code instance (coordinator pattern)
+* `tasks/prd-*.json` - PRD files with user stories
+* `tasks/progress-*.txt` - Progress logs for each feature
+* `.claude/commands/` - Slash command definitions
+
+### Workflow
+
+1. `/prd [feature]` → generates `tasks/prd-feature.md`
+2. `/ralph convert tasks/prd-feature.md` → generates `tasks/prd-feature.json`
+3. `./ralph.sh tasks/prd-feature.json` → runs autonomous loop
+
+### Patterns
+
+* Main Claude (Opus) acts as coordinator - delegates to Sonnet/Haiku subagents
+* Each iteration spawns a fresh Claude Code instance with clean context
+* Memory persists via git history, progress files, and PRD JSON
+* Stories should be small enough to complete in one context window
