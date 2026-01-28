@@ -27,6 +27,14 @@ def custom_bounds() -> tuple[float, float]:
     return (-5.0, 5.0)
 
 
+@pytest.fixture
+def per_variable_bounds() -> tuple[np.ndarray, np.ndarray]:
+    """Per-variable bounds for 3 decision variables."""
+    lower = np.array([0.0, -10.0, 100.0])
+    upper = np.array([1.0, 10.0, 200.0])
+    return (lower, upper)
+
+
 # =============================================================================
 # TestSBXCrossover
 # =============================================================================
@@ -170,6 +178,55 @@ class TestSBXCrossover:
             child = crossover(p1, p2)
             assert np.all(child >= 0.0)
             assert np.all(child <= 1.0)
+
+    def test_child_within_per_variable_bounds(self, per_variable_bounds: tuple[np.ndarray, np.ndarray]) -> None:
+        """Children should respect element-wise per-variable bounds."""
+        lower, upper = per_variable_bounds
+        crossover = sbx_crossover(eta=15.0, bounds=per_variable_bounds, seed=42)
+
+        p1 = np.array([0.5, 0.0, 150.0])
+        p2 = np.array([0.8, -5.0, 180.0])
+
+        for _ in range(100):
+            child = crossover(p1, p2)
+            assert np.all(child >= lower), f"Child below lower bound: {child}"
+            assert np.all(child <= upper), f"Child above upper bound: {child}"
+
+    def test_per_variable_bounds_children_use_full_range(
+        self, per_variable_bounds: tuple[np.ndarray, np.ndarray]
+    ) -> None:
+        """With low eta and extreme parents, children should span most of each variable's range."""
+        lower, upper = per_variable_bounds
+        crossover = sbx_crossover(eta=2.0, bounds=per_variable_bounds, seed=42)
+
+        # Parents at opposite extremes of each variable's range
+        p1 = lower.copy()
+        p2 = upper.copy()
+
+        children = np.array([crossover(p1, p2) for _ in range(500)])
+
+        for i in range(len(lower)):
+            child_range = children[:, i].max() - children[:, i].min()
+            variable_range = upper[i] - lower[i]
+            assert child_range > 0.5 * variable_range, (
+                f"Variable {i}: children span {child_range:.4f} but variable range is {variable_range:.4f}"
+            )
+
+    def test_per_variable_bounds_deterministic_with_seed(
+        self, per_variable_bounds: tuple[np.ndarray, np.ndarray]
+    ) -> None:
+        """Same seed should produce identical children with array bounds."""
+        p1 = np.array([0.5, 0.0, 150.0])
+        p2 = np.array([0.8, -5.0, 180.0])
+
+        crossover1 = sbx_crossover(eta=15.0, bounds=per_variable_bounds, seed=12345)
+        crossover2 = sbx_crossover(eta=15.0, bounds=per_variable_bounds, seed=12345)
+
+        children1 = [crossover1(p1, p2) for _ in range(10)]
+        children2 = [crossover2(p1, p2) for _ in range(10)]
+
+        for c1, c2 in zip(children1, children2, strict=True):
+            np.testing.assert_array_equal(c1, c2)
 
 
 # =============================================================================
@@ -360,6 +417,50 @@ class TestPolynomialMutation:
             assert np.all(mutated_upper >= 0.0)
             assert np.all(mutated_upper <= 1.0)
 
+    def test_mutated_within_per_variable_bounds(self, per_variable_bounds: tuple[np.ndarray, np.ndarray]) -> None:
+        """Mutated values should respect element-wise per-variable bounds."""
+        lower, upper = per_variable_bounds
+        mutate = polynomial_mutation(eta=20.0, prob=1.0, bounds=per_variable_bounds, seed=42)
+
+        x = np.array([0.5, 0.0, 150.0])
+
+        for _ in range(100):
+            mutated = mutate(x)
+            assert np.all(mutated >= lower), f"Below lower bound: {mutated}"
+            assert np.all(mutated <= upper), f"Above upper bound: {mutated}"
+
+    def test_per_variable_bounds_mutation_magnitude_scales(
+        self, per_variable_bounds: tuple[np.ndarray, np.ndarray]
+    ) -> None:
+        """Variable with range 100 should have >10x larger avg mutation than variable with range 1."""
+        mutate = polynomial_mutation(eta=20.0, prob=1.0, bounds=per_variable_bounds, seed=42)
+
+        x = np.array([0.5, 0.0, 150.0])
+
+        deltas = np.array([np.abs(mutate(x) - x) for _ in range(1000)])
+        avg_deltas = deltas.mean(axis=0)
+
+        # Variable 2 (range 100) should have much larger mutations than variable 0 (range 1)
+        assert avg_deltas[2] > 10.0 * avg_deltas[0], (
+            f"Expected variable 2 (range 100) to have >10x larger mutations than "
+            f"variable 0 (range 1). Got avg_deltas={avg_deltas}"
+        )
+
+    def test_per_variable_bounds_deterministic_with_seed(
+        self, per_variable_bounds: tuple[np.ndarray, np.ndarray]
+    ) -> None:
+        """Same seed should produce identical mutations with array bounds."""
+        x = np.array([0.5, 0.0, 150.0])
+
+        mutate1 = polynomial_mutation(eta=20.0, prob=1.0, bounds=per_variable_bounds, seed=12345)
+        mutate2 = polynomial_mutation(eta=20.0, prob=1.0, bounds=per_variable_bounds, seed=12345)
+
+        results1 = [mutate1(x) for _ in range(10)]
+        results2 = [mutate2(x) for _ in range(10)]
+
+        for r1, r2 in zip(results1, results2, strict=True):
+            np.testing.assert_array_equal(r1, r2)
+
 
 # =============================================================================
 # TestIntegration
@@ -476,3 +577,37 @@ class TestIntegration:
 
         ranks = non_dominated_sort(result.population.objectives)
         assert np.sum(ranks == 0) > 0
+
+    def test_both_operators_with_per_variable_bounds(self) -> None:
+        """Full NSGA-II run with per-variable array bounds should keep all individuals in bounds."""
+        from ctrl_freak import nsga2
+
+        lower = np.array([0.0, -10.0, 100.0])
+        upper = np.array([1.0, 10.0, 200.0])
+        bounds = (lower, upper)
+        n_vars = len(lower)
+
+        def init(rng: np.random.Generator) -> np.ndarray:
+            return rng.uniform(lower, upper)
+
+        def evaluate(x: np.ndarray) -> np.ndarray:
+            f1 = np.sum((x - lower) / (upper - lower))
+            f2 = np.sum((upper - x) / (upper - lower))
+            return np.array([f1, f2])
+
+        crossover = sbx_crossover(eta=15.0, bounds=bounds, seed=100)
+        mutate = polynomial_mutation(eta=20.0, bounds=bounds, seed=200)
+
+        result = nsga2(
+            init=init,
+            evaluate=evaluate,
+            crossover=crossover,
+            mutate=mutate,
+            pop_size=20,
+            n_generations=10,
+            seed=42,
+        )
+
+        assert result.population.x.shape == (20, n_vars)
+        assert np.all(result.population.x >= lower), "Some individuals below lower bounds"
+        assert np.all(result.population.x <= upper), "Some individuals above upper bounds"

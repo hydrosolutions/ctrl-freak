@@ -15,10 +15,18 @@ from collections.abc import Callable
 
 import numpy as np
 
+Bounds = tuple[float, float] | tuple[np.ndarray, np.ndarray]
+"""Bounds for decision variables.
+
+A scalar pair ``(lower, upper)`` applies the same bounds to all variables.
+A pair of arrays ``(lower_array, upper_array)`` specifies per-variable bounds;
+each array must have the same length as the decision vector.
+"""
+
 
 def sbx_crossover(
     eta: float = 15.0,
-    bounds: tuple[float, float] = (0.0, 1.0),
+    bounds: Bounds = (0.0, 1.0),
     seed: int | None = None,
 ) -> Callable[[np.ndarray, np.ndarray], np.ndarray]:
     """Create a Simulated Binary Crossover (SBX) operator.
@@ -32,7 +40,10 @@ def sbx_crossover(
             closer to parents; lower values allow more exploration.
             Typical range: 2-20.
         bounds: Lower and upper bounds for decision variables (default (0.0, 1.0)).
-            Children are clipped to these bounds.
+            Children are clipped to these bounds. Can be either:
+            - A scalar pair ``(lower, upper)`` applied uniformly to all variables.
+            - A pair of arrays ``(lower_array, upper_array)`` for per-variable
+              bounds, where each array has the same length as the decision vector.
         seed: Random seed for reproducibility. If None, uses a random seed.
 
     Returns:
@@ -46,6 +57,12 @@ def sbx_crossover(
         >>> child = crossover(p1, p2)
         >>> child.shape
         (3,)
+
+        Per-variable bounds:
+
+        >>> lower = np.array([0.0, -10.0, 100.0])
+        >>> upper = np.array([1.0,  10.0, 200.0])
+        >>> crossover = sbx_crossover(eta=15.0, bounds=(lower, upper), seed=42)
 
     References:
         Deb, K., & Agrawal, R. B. (1995). Simulated binary crossover for
@@ -81,7 +98,7 @@ def sbx_crossover(
 def polynomial_mutation(
     eta: float = 20.0,
     prob: float | None = None,
-    bounds: tuple[float, float] = (0.0, 1.0),
+    bounds: Bounds = (0.0, 1.0),
     seed: int | None = None,
 ) -> Callable[[np.ndarray], np.ndarray]:
     """Create a polynomial mutation operator.
@@ -97,7 +114,10 @@ def polynomial_mutation(
         prob: Mutation probability per variable (default None, which uses 1/n_vars).
             If specified, each variable is mutated with this probability.
         bounds: Lower and upper bounds for decision variables (default (0.0, 1.0)).
-            Mutations respect these bounds.
+            Mutations respect these bounds. Can be either:
+            - A scalar pair ``(lower, upper)`` applied uniformly to all variables.
+            - A pair of arrays ``(lower_array, upper_array)`` for per-variable
+              bounds, where each array has the same length as the decision vector.
         seed: Random seed for reproducibility. If None, uses a random seed.
 
     Returns:
@@ -110,6 +130,12 @@ def polynomial_mutation(
         >>> mutated = mutate(x)
         >>> mutated.shape
         (3,)
+
+        Per-variable bounds:
+
+        >>> lower = np.array([0.0, -10.0, 100.0])
+        >>> upper = np.array([1.0,  10.0, 200.0])
+        >>> mutate = polynomial_mutation(eta=20.0, prob=0.1, bounds=(lower, upper), seed=42)
 
     References:
         Deb, K., & Goyal, M. (1996). A combined genetic adaptive search (GeneAS)
