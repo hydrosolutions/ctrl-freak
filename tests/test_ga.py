@@ -665,3 +665,106 @@ class TestGASphereConvergence:
             _, fitness = result.best
             # Should achieve some level of optimization
             assert fitness < 50.0, f"Strategy {strategies[i]} did not optimize: fitness={fitness}"
+
+
+# =============================================================================
+# TestGAParallelEvaluation
+# =============================================================================
+
+
+class TestGAParallelEvaluation:
+    """Tests for parallel evaluation in GA."""
+
+    def test_parallel_produces_same_result_as_sequential(self, sphere_problem: dict) -> None:
+        """Parallel evaluation should produce identical results to sequential with same seed."""
+        # Use deterministic operators
+        def deterministic_crossover(p1: np.ndarray, p2: np.ndarray) -> np.ndarray:
+            return (p1 + p2) / 2
+
+        def deterministic_mutate(x: np.ndarray) -> np.ndarray:
+            return x.copy()
+
+        kwargs = {
+            "init": sphere_problem["init"],
+            "evaluate": sphere_problem["evaluate"],
+            "crossover": deterministic_crossover,
+            "mutate": deterministic_mutate,
+            "pop_size": 10,
+            "n_generations": 5,
+            "seed": 42,
+        }
+
+        result_seq = ga(**kwargs, n_workers=1)
+        result_par = ga(**kwargs, n_workers=2)
+
+        np.testing.assert_array_equal(result_seq.population.x, result_par.population.x)
+        np.testing.assert_array_equal(result_seq.fitness, result_par.fitness)
+        assert result_seq.best_idx == result_par.best_idx
+
+    def test_n_workers_minus_one_smoke_test(self, sphere_problem: dict) -> None:
+        """n_workers=-1 (all cores) should work without errors."""
+        crossover = sbx_crossover(eta=15.0, bounds=sphere_problem["bounds"], seed=42)
+        mutate = polynomial_mutation(eta=20.0, bounds=sphere_problem["bounds"], seed=43)
+
+        result = ga(
+            init=sphere_problem["init"],
+            evaluate=sphere_problem["evaluate"],
+            crossover=crossover,
+            mutate=mutate,
+            pop_size=10,
+            n_generations=2,
+            seed=42,
+            n_workers=-1,
+        )
+
+        assert isinstance(result, GAResult)
+        assert len(result.population) == 10
+
+    def test_invalid_n_workers_raises_value_error(self, sphere_problem: dict) -> None:
+        """Invalid n_workers values should raise ValueError."""
+        crossover = sbx_crossover(eta=15.0, bounds=sphere_problem["bounds"], seed=42)
+        mutate = polynomial_mutation(eta=20.0, bounds=sphere_problem["bounds"], seed=43)
+
+        with pytest.raises(ValueError, match="n_workers must be positive or -1"):
+            ga(
+                init=sphere_problem["init"],
+                evaluate=sphere_problem["evaluate"],
+                crossover=crossover,
+                mutate=mutate,
+                pop_size=10,
+                n_generations=5,
+                seed=42,
+                n_workers=0,
+            )
+
+        with pytest.raises(ValueError, match="n_workers must be positive or -1"):
+            ga(
+                init=sphere_problem["init"],
+                evaluate=sphere_problem["evaluate"],
+                crossover=crossover,
+                mutate=mutate,
+                pop_size=10,
+                n_generations=5,
+                seed=42,
+                n_workers=-2,
+            )
+
+    def test_evaluations_count_same_parallel_vs_sequential(self, sphere_problem: dict) -> None:
+        """Total evaluation count should be same for parallel and sequential."""
+        crossover = sbx_crossover(eta=15.0, bounds=sphere_problem["bounds"], seed=42)
+        mutate = polynomial_mutation(eta=20.0, bounds=sphere_problem["bounds"], seed=43)
+
+        kwargs = {
+            "init": sphere_problem["init"],
+            "evaluate": sphere_problem["evaluate"],
+            "crossover": crossover,
+            "mutate": mutate,
+            "pop_size": 10,
+            "n_generations": 5,
+            "seed": 42,
+        }
+
+        result_seq = ga(**kwargs, n_workers=1)
+        result_par = ga(**kwargs, n_workers=2)
+
+        assert result_seq.evaluations == result_par.evaluations

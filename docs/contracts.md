@@ -118,6 +118,13 @@ def evaluate(x: np.ndarray) -> np.ndarray:
 - `np.nan` (breaks dominance comparisons)
 - Wrong shape (causes stacking errors)
 
+**Parallel execution requirements:**
+
+When using `n_workers > 1`, the `evaluate` function must be picklable:
+- Define functions at module level (not inside other functions)
+- Avoid closures over unpicklable objects (file handles, database connections)
+- Lambda functions work if they don't capture unpicklable state
+
 #### Single-Objective Evaluation (for ga())
 
 When using the `ga()` function for single-objective optimization, `evaluate` returns a scalar:

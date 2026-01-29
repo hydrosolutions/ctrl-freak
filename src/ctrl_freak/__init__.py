@@ -28,7 +28,14 @@ Example (single-objective with GA):
 
 from ctrl_freak.algorithm import survivor_selection
 from ctrl_freak.algorithms import ga, nsga2
-from ctrl_freak.operators import create_offspring, lift, polynomial_mutation, sbx_crossover, select_parents
+from ctrl_freak.operators import (
+    create_offspring,
+    lift,
+    lift_parallel,
+    polynomial_mutation,
+    sbx_crossover,
+    select_parents,
+)
 from ctrl_freak.population import IndividualView, Population
 from ctrl_freak.primitives import (
     crowding_distance,
@@ -60,6 +67,7 @@ __all__ = [
     "elitist_survival",
     # Genetic operators
     "lift",
+    "lift_parallel",
     "select_parents",
     "create_offspring",
     "sbx_crossover",

@@ -10,7 +10,7 @@ import numpy as np
 import pytest
 
 from ctrl_freak import crowding_distance as compute_crowding_distance
-from ctrl_freak.operators import create_offspring, lift, select_parents
+from ctrl_freak.operators import create_offspring, lift, lift_parallel, select_parents
 from ctrl_freak.population import Population
 
 # =============================================================================
@@ -228,6 +228,107 @@ class TestLift:
             return x.astype(np.int32)
 
         lifted_fn = lift(to_int)
+        pop_x = np.array([[1.5, 2.5], [3.5, 4.5]])
+
+        result = lifted_fn(pop_x)
+
+        assert result.dtype == np.int32
+
+
+class TestLiftParallel:
+    """Tests for the lift_parallel function."""
+
+    def test_applies_to_each_row(self) -> None:
+        """Lifted parallel function should apply to each row of input."""
+
+        def double(x: np.ndarray) -> np.ndarray:
+            return x * 2
+
+        lifted_fn = lift_parallel(double, n_workers=2)
+        pop_x = np.array([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]])
+
+        result = lifted_fn(pop_x)
+
+        expected = np.array([[2.0, 4.0], [6.0, 8.0], [10.0, 12.0]])
+        np.testing.assert_array_equal(result, expected)
+
+    def test_preserves_output_shape(self) -> None:
+        """Output shape should be (n, output_dim)."""
+
+        def identity(x: np.ndarray) -> np.ndarray:
+            return x
+
+        lifted_fn = lift_parallel(identity, n_workers=2)
+        pop_x = np.array([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
+
+        result = lifted_fn(pop_x)
+
+        assert result.shape == (2, 3)
+
+    def test_handles_dimension_change(self) -> None:
+        """Lifted function should handle output dimension different from input."""
+
+        def evaluate(x: np.ndarray) -> np.ndarray:
+            return np.array([x.sum(), x.prod()])
+
+        lifted_fn = lift_parallel(evaluate, n_workers=2)
+        pop_x = np.array([[1.0, 2.0], [3.0, 4.0]])
+
+        result = lifted_fn(pop_x)
+
+        assert result.shape == (2, 2)
+        expected = np.array([[3.0, 2.0], [7.0, 12.0]])
+        np.testing.assert_array_equal(result, expected)
+
+    def test_equivalence_with_serial_lift(self) -> None:
+        """Parallel lift should produce same results as serial lift."""
+
+        def evaluate(x: np.ndarray) -> np.ndarray:
+            return np.array([x.sum(), x.mean(), x.max()])
+
+        pop_x = np.array([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 9.0]])
+
+        serial_result = lift(evaluate)(pop_x)
+        parallel_result = lift_parallel(evaluate, n_workers=2)(pop_x)
+
+        np.testing.assert_array_equal(serial_result, parallel_result)
+
+    def test_single_row_input(self) -> None:
+        """Lifted function should work with single row input."""
+
+        def square(x: np.ndarray) -> np.ndarray:
+            return x**2
+
+        lifted_fn = lift_parallel(square, n_workers=2)
+        pop_x = np.array([[2.0, 3.0]])
+
+        result = lifted_fn(pop_x)
+
+        assert result.shape == (1, 2)
+        expected = np.array([[4.0, 9.0]])
+        np.testing.assert_array_equal(result, expected)
+
+    def test_n_workers_all_cores(self) -> None:
+        """n_workers=-1 should work (uses all CPU cores)."""
+
+        def double(x: np.ndarray) -> np.ndarray:
+            return x * 2
+
+        lifted_fn = lift_parallel(double, n_workers=-1)
+        pop_x = np.array([[1.0, 2.0], [3.0, 4.0]])
+
+        result = lifted_fn(pop_x)
+
+        expected = np.array([[2.0, 4.0], [6.0, 8.0]])
+        np.testing.assert_array_equal(result, expected)
+
+    def test_preserves_dtype(self) -> None:
+        """Lifted function should preserve the dtype of the output."""
+
+        def to_int(x: np.ndarray) -> np.ndarray:
+            return x.astype(np.int32)
+
+        lifted_fn = lift_parallel(to_int, n_workers=2)
         pop_x = np.array([[1.5, 2.5], [3.5, 4.5]])
 
         result = lifted_fn(pop_x)

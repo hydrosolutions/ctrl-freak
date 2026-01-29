@@ -9,7 +9,7 @@ from collections.abc import Callable
 
 import numpy as np
 
-from ctrl_freak.operators import create_offspring, lift
+from ctrl_freak.operators import create_offspring, lift, lift_parallel
 from ctrl_freak.population import Population
 from ctrl_freak.primitives import crowding_distance, non_dominated_sort
 
@@ -110,6 +110,7 @@ def nsga2(
     n_generations: int,
     seed: int | None = None,
     callback: Callable[[Population, int], bool] | None = None,
+    n_workers: int = 1,
 ) -> Population:
     """Run NSGA-II multi-objective optimization.
 
@@ -133,13 +134,17 @@ def nsga2(
         callback: Optional callback called each generation.
             Signature: (pop, gen) -> stop?
             If callback returns True, optimization stops early.
+        n_workers: Number of parallel workers for evaluation. Use 1 for sequential
+            execution (default), -1 for all CPU cores, or any positive integer.
+            Note: evaluate function must be picklable for parallel execution.
 
     Returns:
         Final population with x and objectives. Pareto-optimal solutions can
         be extracted by computing ranks: pop.x[non_dominated_sort(pop.objectives) == 0]
 
     Raises:
-        ValueError: If pop_size or n_generations is not positive.
+        ValueError: If pop_size or n_generations is not positive, or if
+            n_workers is invalid.
 
     Example:
         >>> def init(rng):
@@ -158,12 +163,17 @@ def nsga2(
         raise ValueError(f"pop_size must be positive, got {pop_size}")
     if n_generations < 0:
         raise ValueError(f"n_generations must be non-negative, got {n_generations}")
+    if n_workers < 1 and n_workers != -1:
+        raise ValueError(f"n_workers must be positive or -1 (all cores), got {n_workers}")
 
     rng = np.random.default_rng(seed)
 
+    # Create evaluator (parallel or sequential)
+    lifted_evaluate = lift_parallel(evaluate, n_workers) if n_workers != 1 else lift(evaluate)
+
     # Initialize population
     init_x = np.stack([init(rng) for _ in range(pop_size)])
-    init_obj = lift(evaluate)(init_x)
+    init_obj = lifted_evaluate(init_x)
 
     # Compute initial ranks and crowding distances (algorithm-local, not stored in Population)
     ranks = non_dominated_sort(init_obj)
@@ -179,7 +189,7 @@ def nsga2(
 
         # Create offspring using current rank and crowding distance for selection
         offspring_x = create_offspring(pop, pop_size, crossover, mutate, rng, rank=ranks, crowding_distance=cd)
-        offspring_obj = lift(evaluate)(offspring_x)
+        offspring_obj = lifted_evaluate(offspring_x)
 
         # Combine parent and offspring populations
         # pop.objectives is guaranteed non-None here since we initialized with objectives

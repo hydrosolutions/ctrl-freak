@@ -78,6 +78,7 @@ Example:
 from collections.abc import Callable
 
 import numpy as np
+from joblib import Parallel, delayed
 
 # Import selection and survival modules to trigger strategy registration
 import ctrl_freak.selection  # noqa: F401
@@ -99,6 +100,7 @@ def ga(
     callback: Callable[[GAResult, int], bool] | None = None,
     select: str | ParentSelector = "tournament",
     survive: str | SurvivorSelector = "elitist",
+    n_workers: int = 1,
 ) -> GAResult:
     """Run standard single-objective genetic algorithm with pluggable strategies.
 
@@ -128,6 +130,9 @@ def ga(
         survive: Survivor selection strategy. Can be:
             - String: Name of registered strategy (e.g., "elitist", "truncation")
             - SurvivorSelector: Direct callable following the SurvivorSelector protocol
+        n_workers: Number of parallel workers for evaluation. Use 1 for sequential
+            execution (default), -1 for all CPU cores, or any positive integer.
+            Note: evaluate function must be picklable for parallel execution.
 
     Returns:
         GAResult containing:
@@ -139,7 +144,8 @@ def ga(
 
     Raises:
         ValueError: If pop_size is not positive, if pop_size is odd (required for
-            parent pairing), or if n_generations is negative.
+            parent pairing), if n_generations is negative, or if n_workers is
+            invalid (must be positive or -1).
         KeyError: If string strategy names are not found in registries.
 
     Algorithm Flow:
@@ -232,6 +238,8 @@ def ga(
         raise ValueError(f"pop_size must be even for proper parent pairing, got {pop_size}")
     if n_generations < 0:
         raise ValueError(f"n_generations must be non-negative, got {n_generations}")
+    if n_workers < 1 and n_workers != -1:
+        raise ValueError(f"n_workers must be positive or -1 (all cores), got {n_workers}")
 
     # Resolve selection and survival strategies
     parent_selector = SelectionRegistry.get(select) if isinstance(select, str) else select
@@ -243,7 +251,10 @@ def ga(
     # Initialize population
     init_x = np.stack([init(rng) for _ in range(pop_size)])
     # Apply per-individual evaluation (lift expects array->array, so we evaluate manually)
-    init_obj = np.array([evaluate(init_x[i]) for i in range(pop_size)])
+    if n_workers != 1:
+        init_obj = np.array(Parallel(n_jobs=n_workers)(delayed(evaluate)(init_x[i]) for i in range(pop_size)))
+    else:
+        init_obj = np.array([evaluate(init_x[i]) for i in range(pop_size)])
 
     # Ensure objectives are shape (n, 1) for single-objective
     if init_obj.ndim == 1:
@@ -292,7 +303,12 @@ def ga(
             offspring_x[i + 1] = mutate(child2)
 
         # Evaluate offspring
-        offspring_obj = np.array([evaluate(offspring_x[i]) for i in range(pop_size)])
+        if n_workers != 1:
+            offspring_obj = np.array(
+                Parallel(n_jobs=n_workers)(delayed(evaluate)(offspring_x[i]) for i in range(pop_size))
+            )
+        else:
+            offspring_obj = np.array([evaluate(offspring_x[i]) for i in range(pop_size)])
         # Ensure shape (n, 1)
         if offspring_obj.ndim == 1:
             offspring_obj = offspring_obj.reshape(-1, 1)

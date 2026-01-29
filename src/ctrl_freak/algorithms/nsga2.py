@@ -79,15 +79,14 @@ from collections.abc import Callable
 
 import numpy as np
 
-from ctrl_freak.operators import lift
+# Import selection and survival modules to trigger strategy registration
+import ctrl_freak.selection  # noqa: F401
+import ctrl_freak.survival  # noqa: F401
+from ctrl_freak.operators import lift, lift_parallel
 from ctrl_freak.population import Population
 from ctrl_freak.protocols import ParentSelector, SurvivorSelector
 from ctrl_freak.registry import SelectionRegistry, SurvivalRegistry
 from ctrl_freak.results import NSGA2Result
-
-# Import selection and survival modules to trigger strategy registration
-import ctrl_freak.selection  # noqa: F401
-import ctrl_freak.survival  # noqa: F401
 
 
 def nsga2(
@@ -101,6 +100,7 @@ def nsga2(
     callback: Callable[[NSGA2Result, int], bool] | None = None,
     select: str | ParentSelector = "crowded",
     survive: str | SurvivorSelector = "nsga2",
+    n_workers: int = 1,
 ) -> NSGA2Result:
     """Run NSGA-II multi-objective optimization with pluggable strategies.
 
@@ -131,6 +131,9 @@ def nsga2(
         survive: Survivor selection strategy. Can be:
             - String: Name of registered strategy (e.g., "nsga2", "truncation", "elitist")
             - SurvivorSelector: Direct callable following the SurvivorSelector protocol
+        n_workers: Number of parallel workers for evaluation. Use 1 for sequential
+            execution (default), -1 for all CPU cores, or any positive integer.
+            Note: evaluate function must be picklable for parallel execution.
 
     Returns:
         NSGA2Result containing:
@@ -142,7 +145,8 @@ def nsga2(
 
     Raises:
         ValueError: If pop_size is not positive, if pop_size is odd (required for
-            parent pairing), or if n_generations is negative.
+            parent pairing), if n_generations is negative, or if n_workers is
+            invalid (must be positive or -1).
         KeyError: If string strategy names are not found in registries.
 
     Algorithm Flow:
@@ -235,29 +239,28 @@ def nsga2(
         raise ValueError(f"pop_size must be even for proper parent pairing, got {pop_size}")
     if n_generations < 0:
         raise ValueError(f"n_generations must be non-negative, got {n_generations}")
+    if n_workers < 1 and n_workers != -1:
+        raise ValueError(f"n_workers must be positive or -1 (all cores), got {n_workers}")
 
     # Resolve selection and survival strategies
-    if isinstance(select, str):
-        parent_selector = SelectionRegistry.get(select)
-    else:
-        parent_selector = select
+    parent_selector = SelectionRegistry.get(select) if isinstance(select, str) else select
 
-    if isinstance(survive, str):
-        survivor_selector = SurvivalRegistry.get(survive)
-    else:
-        survivor_selector = survive
+    survivor_selector = SurvivalRegistry.get(survive) if isinstance(survive, str) else survive
+
+    # Create evaluator (parallel or sequential)
+    lifted_evaluate = lift_parallel(evaluate, n_workers) if n_workers != 1 else lift(evaluate)
 
     # Initialize random number generator
     rng = np.random.default_rng(seed)
 
     # Initialize population
     init_x = np.stack([init(rng) for _ in range(pop_size)])
-    init_obj = lift(evaluate)(init_x)
+    init_obj = lifted_evaluate(init_x)
     pop = Population(x=init_x, objectives=init_obj)
 
     # Compute initial state via survival strategy
     # This gives us initial rank and crowding distance
-    initial_indices = np.arange(pop_size)
+    np.arange(pop_size)
     _, state = survivor_selector(pop, pop_size)
 
     # Track evaluations: initial population
@@ -292,7 +295,7 @@ def nsga2(
             offspring_x[i + 1] = mutate(child2)
 
         # Evaluate offspring
-        offspring_obj = lift(evaluate)(offspring_x)
+        offspring_obj = lifted_evaluate(offspring_x)
         total_evaluations += pop_size
 
         # Combine parent and offspring populations

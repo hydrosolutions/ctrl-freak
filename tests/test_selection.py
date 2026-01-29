@@ -114,7 +114,7 @@ class TestCrowdedTournament:
     def test_determinism_same_seed_same_results(self, simple_population):
         """Test that same RNG seed produces same results."""
         selector = crowded_tournament(tournament_size=2)
-        pop_size = len(simple_population)
+        len(simple_population)
         n_parents = 20
 
         rank = np.array([0, 0, 1, 1, 2, 2, 3, 3, 4, 4], dtype=np.intp)
@@ -294,7 +294,7 @@ class TestFitnessTournament:
     def test_fitness_preference_lower_wins(self, simple_population, rng):
         """Test that lower fitness always wins (minimization)."""
         selector = fitness_tournament(tournament_size=2)
-        pop_size = len(simple_population)
+        len(simple_population)
 
         # Create scenario: individual 0 has much lower fitness than all others
         fitness = np.array([0.1, 10.0, 10.0, 10.0])
@@ -314,7 +314,7 @@ class TestFitnessTournament:
 
     def test_tournament_size_effect(self, simple_population):
         """Test that larger tournament size increases selection pressure."""
-        pop_size = len(simple_population)
+        len(simple_population)
 
         # Create scenario: individual 0 has best fitness
         fitness = np.array([1.0, 10.0, 10.0, 10.0])

@@ -199,6 +199,7 @@ def ga(
     callback: Callable[[GAResult, int], bool] | None = None,
     select: str | ParentSelector = 'tournament',
     survive: str | SurvivorSelector = 'elitist',
+    n_workers: int = 1,
 ) -> GAResult
 ```
 
@@ -231,6 +232,7 @@ class GAResult:
 | `callback` | `(result, gen) -> bool` | Optional function called each generation; return `True` to stop |
 | `select` | `str \| ParentSelector` | Parent selection strategy (default: 'tournament') |
 | `survive` | `str \| SurvivorSelector` | Survival selection strategy (default: 'elitist') |
+| `n_workers` | `int` | Number of parallel workers (1=sequential, -1=all cores) |
 
 ### Example: Tracking Convergence
 
@@ -271,6 +273,7 @@ def nsga2(
     callback: Callable[[NSGA2Result, int], bool] | None = None,
     select: str | ParentSelector = 'crowded',
     survive: str | SurvivorSelector = 'nsga2',
+    n_workers: int = 1,
 ) -> NSGA2Result
 ```
 
@@ -304,6 +307,7 @@ class NSGA2Result:
 | `callback` | `(result, gen) -> bool` | Optional function called each generation; return `True` to stop |
 | `select` | `str \| ParentSelector` | Parent selection strategy (default: 'crowded') |
 | `survive` | `str \| SurvivorSelector` | Survival selection strategy (default: 'nsga2') |
+| `n_workers` | `int` | Number of parallel workers (1=sequential, -1=all cores) |
 
 ### Using Callbacks
 
@@ -373,6 +377,45 @@ The seed controls:
 - Initial population generation (via `init`)
 - Parent selection
 - Any randomness in crossover/mutate if they use the provided RNG
+
+### Parallel Evaluation
+
+For expensive evaluation functions, use the `n_workers` parameter to parallelize:
+
+```python
+# Use 4 parallel workers
+result = nsga2(
+    init=init,
+    evaluate=expensive_evaluate,
+    crossover=crossover,
+    mutate=mutate,
+    pop_size=100,
+    n_generations=200,
+    seed=42,
+    n_workers=4,
+)
+
+# Use all available CPU cores
+result = nsga2(..., n_workers=-1)
+```
+
+**When to use parallel evaluation:**
+
+- Evaluation takes >10ms per individual
+- Population size is large (100+)
+- You have multiple CPU cores available
+
+**When NOT to use:**
+
+- Fast evaluation functions (overhead exceeds benefit)
+- Small populations
+- Evaluation uses shared resources (GPU, database connections)
+
+**Caveats:**
+
+- The `evaluate` function must be **picklable** (no closures over unpicklable objects)
+- Memory usage scales with `n_workers` (each worker gets a copy of data)
+- Results are deterministic regardless of `n_workers` (same seed = same results)
 
 ---
 

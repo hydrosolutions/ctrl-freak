@@ -672,3 +672,93 @@ class TestEdgeCases:
 
         assert len(result.population) == 10
         assert result.population.x.shape[1] == n_vars
+
+
+# =============================================================================
+# TestNSGA2ParallelEvaluation
+# =============================================================================
+
+
+class TestNSGA2ParallelEvaluation:
+    """Tests for parallel evaluation in NSGA-II."""
+
+    def test_parallel_produces_same_result_as_sequential(self, simple_biobj_problem: dict) -> None:
+        """Parallel evaluation should produce identical results to sequential with same seed."""
+        # Use deterministic operators
+        def deterministic_mutate(x: np.ndarray) -> np.ndarray:
+            return x.copy()
+
+        kwargs = {
+            "init": simple_biobj_problem["init"],
+            "evaluate": simple_biobj_problem["evaluate"],
+            "crossover": simple_biobj_problem["crossover"],
+            "mutate": deterministic_mutate,
+            "pop_size": 10,
+            "n_generations": 5,
+            "seed": 42,
+        }
+
+        result_seq = nsga2(**kwargs, n_workers=1)
+        result_par = nsga2(**kwargs, n_workers=2)
+
+        np.testing.assert_array_equal(result_seq.population.x, result_par.population.x)
+        np.testing.assert_array_equal(result_seq.population.objectives, result_par.population.objectives)
+
+    def test_n_workers_minus_one_smoke_test(self, simple_biobj_problem: dict) -> None:
+        """n_workers=-1 (all cores) should work without errors."""
+        result = nsga2(
+            init=simple_biobj_problem["init"],
+            evaluate=simple_biobj_problem["evaluate"],
+            crossover=simple_biobj_problem["crossover"],
+            mutate=simple_biobj_problem["mutate"],
+            pop_size=10,
+            n_generations=2,
+            seed=42,
+            n_workers=-1,
+        )
+
+        assert isinstance(result, NSGA2Result)
+        assert len(result.population) == 10
+
+    def test_invalid_n_workers_raises_value_error(self, simple_biobj_problem: dict) -> None:
+        """Invalid n_workers values should raise ValueError."""
+        with pytest.raises(ValueError, match="n_workers must be positive or -1"):
+            nsga2(
+                init=simple_biobj_problem["init"],
+                evaluate=simple_biobj_problem["evaluate"],
+                crossover=simple_biobj_problem["crossover"],
+                mutate=simple_biobj_problem["mutate"],
+                pop_size=10,
+                n_generations=5,
+                seed=42,
+                n_workers=0,
+            )
+
+        with pytest.raises(ValueError, match="n_workers must be positive or -1"):
+            nsga2(
+                init=simple_biobj_problem["init"],
+                evaluate=simple_biobj_problem["evaluate"],
+                crossover=simple_biobj_problem["crossover"],
+                mutate=simple_biobj_problem["mutate"],
+                pop_size=10,
+                n_generations=5,
+                seed=42,
+                n_workers=-2,
+            )
+
+    def test_evaluations_count_same_parallel_vs_sequential(self, simple_biobj_problem: dict) -> None:
+        """Total evaluation count should be same for parallel and sequential."""
+        kwargs = {
+            "init": simple_biobj_problem["init"],
+            "evaluate": simple_biobj_problem["evaluate"],
+            "crossover": simple_biobj_problem["crossover"],
+            "mutate": simple_biobj_problem["mutate"],
+            "pop_size": 10,
+            "n_generations": 5,
+            "seed": 42,
+        }
+
+        result_seq = nsga2(**kwargs, n_workers=1)
+        result_par = nsga2(**kwargs, n_workers=2)
+
+        assert result_seq.evaluations == result_par.evaluations

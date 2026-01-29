@@ -62,9 +62,7 @@ def crowded_tournament(tournament_size: int = 2):
             # Find winner: prefer lower rank, break ties with higher crowding distance
             best_idx = candidates[0]
             for c in candidates[1:]:
-                if rank[c] < rank[best_idx]:
-                    best_idx = c
-                elif rank[c] == rank[best_idx] and crowding_distance[c] > crowding_distance[best_idx]:
+                if rank[c] < rank[best_idx] or rank[c] == rank[best_idx] and crowding_distance[c] > crowding_distance[best_idx]:
                     best_idx = c
 
             selected[i] = best_idx

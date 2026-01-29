@@ -8,8 +8,8 @@ This module provides:
 - create_offspring: Create offspring via selection, crossover, and mutation
 """
 
-from ctrl_freak.operators.base import lift
+from ctrl_freak.operators.base import lift, lift_parallel
 from ctrl_freak.operators.selection import create_offspring, select_parents
 from ctrl_freak.operators.standard import polynomial_mutation, sbx_crossover
 
-__all__ = ["lift", "sbx_crossover", "polynomial_mutation", "select_parents", "create_offspring"]
+__all__ = ["lift", "lift_parallel", "sbx_crossover", "polynomial_mutation", "select_parents", "create_offspring"]

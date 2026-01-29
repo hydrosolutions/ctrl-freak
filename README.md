@@ -124,11 +124,13 @@ print(f"Best fitness: {result.best[1]:.6f}")
 ```python
 # Multi-objective optimization
 nsga2(init, evaluate, crossover, mutate, pop_size, n_generations,
-      seed=None, callback=None, select='crowded', survive='nsga2') -> NSGA2Result
+      seed=None, callback=None, select='crowded', survive='nsga2',
+      n_workers=1) -> NSGA2Result
 
 # Single-objective optimization
 ga(init, evaluate, crossover, mutate, pop_size, n_generations,
-   seed=None, callback=None, select='tournament', survive='elitist') -> GAResult
+   seed=None, callback=None, select='tournament', survive='elitist',
+   n_workers=1) -> GAResult
 ```
 
 ### User Function Contracts
@@ -143,6 +145,7 @@ ga(init, evaluate, crossover, mutate, pop_size, n_generations,
 ### Result Types
 
 **NSGA2Result** — Multi-objective optimization result:
+
 - `population: Population` — Final population
 - `rank: np.ndarray` — Pareto front ranks `(n,)` where 0 = optimal
 - `crowding_distance: np.ndarray` — Diversity measure `(n,)`
@@ -151,6 +154,7 @@ ga(init, evaluate, crossover, mutate, pop_size, n_generations,
 - `evaluations: int` — Total evaluations
 
 **GAResult** — Single-objective optimization result:
+
 - `population: Population` — Final population
 - `fitness: np.ndarray` — Fitness values `(n,)`
 - `best: tuple[np.ndarray, float]` — Property returning (best_x, best_fitness)
@@ -160,6 +164,7 @@ ga(init, evaluate, crossover, mutate, pop_size, n_generations,
 ### Data Structures
 
 **Population** — Immutable collection of solutions:
+
 - `x: np.ndarray` — Decision variables `(n, n_vars)`
 - `objectives: np.ndarray | None` — Objective values `(n, n_obj)`
 
