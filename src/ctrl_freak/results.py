@@ -25,32 +25,37 @@ class NSGA2Result:
     metadata like Pareto ranks and crowding distances. All arrays are copied
     on construction to ensure immutability.
 
-    Attributes:
-        population: The final population after optimization.
-        rank: Pareto rank for each individual, shape (n,). Rank 0 indicates
-            individuals on the Pareto front (non-dominated).
-        crowding_distance: Crowding distance for each individual, shape (n,).
-            Used for diversity preservation. Individuals at extremes have infinite
-            crowding distance.
-        generations: Number of generations completed during optimization.
-        evaluations: Total number of objective function evaluations performed.
+    Attributes
+    ----------
+    population : Population
+        The final population after optimization.
+    rank : numpy.ndarray
+        Pareto rank for each individual. Rank 0 indicates individuals on the
+        Pareto front.
+    crowding_distance : numpy.ndarray
+        Crowding distance for each individual.
+    generations : int
+        Number of generations completed during optimization.
+    evaluations : int
+        Total number of objective function evaluations performed.
 
-    Example:
-        >>> x = np.array([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]])
-        >>> obj = np.array([[0.5, 0.5], [0.3, 0.7], [0.4, 0.6]])
-        >>> pop = Population(x=x, objectives=obj)
-        >>> rank = np.array([0, 0, 1])
-        >>> cd = np.array([np.inf, np.inf, 0.5])
-        >>> result = NSGA2Result(
-        ...     population=pop,
-        ...     rank=rank,
-        ...     crowding_distance=cd,
-        ...     generations=100,
-        ...     evaluations=5000
-        ... )
-        >>> front = result.pareto_front
-        >>> len(front)
-        2
+    Examples
+    --------
+    >>> import numpy as np
+    >>> from ctrl_freak.population import Population
+    >>> from ctrl_freak.results import NSGA2Result
+    >>> x = np.array([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]])
+    >>> obj = np.array([[0.5, 0.5], [0.3, 0.7], [0.4, 0.6]])
+    >>> pop = Population(x=x, objectives=obj)
+    >>> result = NSGA2Result(
+    ...     population=pop,
+    ...     rank=np.array([0, 0, 1]),
+    ...     crowding_distance=np.array([np.inf, np.inf, 0.5]),
+    ...     generations=100,
+    ...     evaluations=5000,
+    ... )
+    >>> len(result.pareto_front)
+    2
     """
 
     population: Population
@@ -62,9 +67,12 @@ class NSGA2Result:
     def __post_init__(self) -> None:
         """Validate shapes and copy arrays for immutability.
 
-        Raises:
-            TypeError: If rank or crowding_distance are not numpy arrays.
-            ValueError: If array shapes are inconsistent.
+        Raises
+        ------
+        TypeError
+            If rank or crowding_distance are not numpy arrays.
+        ValueError
+            If array shapes are inconsistent.
         """
         n = len(self.population)
 
@@ -82,7 +90,9 @@ class NSGA2Result:
         if self.crowding_distance.ndim != 1:
             raise ValueError(f"crowding_distance must be 1D, got shape {self.crowding_distance.shape}")
         if self.crowding_distance.shape[0] != n:
-            raise ValueError(f"crowding_distance has {self.crowding_distance.shape[0]} elements, expected {n} to match population size")
+            raise ValueError(
+                f"crowding_distance has {self.crowding_distance.shape[0]} elements, expected {n} to match population size"
+            )
 
         # Copy arrays for immutability (use object.__setattr__ for frozen dataclass)
         object.__setattr__(self, "rank", self.rank.copy())
@@ -92,13 +102,29 @@ class NSGA2Result:
     def pareto_front(self) -> Population:
         """Extract the Pareto front (rank-0 individuals) as a new Population.
 
-        Returns:
+        Returns
+        -------
+        Population
             A new Population containing only individuals with rank 0.
 
-        Example:
-            >>> # Assuming result is an NSGA2Result instance
-            >>> front = result.pareto_front
-            >>> front.n_individuals  # Number of individuals on Pareto front
+        Examples
+        --------
+        >>> import numpy as np
+        >>> from ctrl_freak.population import Population
+        >>> from ctrl_freak.results import NSGA2Result
+        >>> pop = Population(
+        ...     x=np.array([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]]),
+        ...     objectives=np.array([[0.5, 0.5], [0.3, 0.7], [0.4, 0.6]]),
+        ... )
+        >>> result = NSGA2Result(
+        ...     population=pop,
+        ...     rank=np.array([0, 0, 1]),
+        ...     crowding_distance=np.array([np.inf, np.inf, 0.5]),
+        ...     generations=1,
+        ...     evaluations=3,
+        ... )
+        >>> len(result.pareto_front)
+        2
         """
         # Find indices of rank-0 individuals
         rank_0_mask = self.rank == 0
@@ -107,9 +133,7 @@ class NSGA2Result:
         # Extract rank-0 individuals
         x_front = self.population.x[rank_0_indices]
         objectives_front = (
-            self.population.objectives[rank_0_indices]
-            if self.population.objectives is not None
-            else None
+            self.population.objectives[rank_0_indices] if self.population.objectives is not None else None
         )
 
         return Population(x=x_front, objectives=objectives_front)
@@ -123,30 +147,35 @@ class GAResult:
     for each individual. In minimization problems, lower fitness is better.
     All arrays are copied on construction to ensure immutability.
 
-    Attributes:
-        population: The final population after optimization.
-        fitness: Fitness values for each individual, shape (n,). Lower values
-            indicate better fitness for minimization problems.
-        best_idx: Index of the best individual (lowest fitness for minimization).
-        generations: Number of generations completed during optimization.
-        evaluations: Total number of objective function evaluations performed.
+    Attributes
+    ----------
+    population : Population
+        The final population after optimization.
+    fitness : numpy.ndarray
+        Fitness values for each individual. Lower values indicate better
+        fitness for minimization problems.
+    best_idx : int
+        Index of the best individual.
+    generations : int
+        Number of generations completed during optimization.
+    evaluations : int
+        Total number of objective function evaluations performed.
 
-    Example:
-        >>> x = np.array([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]])
-        >>> pop = Population(x=x)
-        >>> fitness = np.array([0.5, 0.3, 0.7])
-        >>> result = GAResult(
-        ...     population=pop,
-        ...     fitness=fitness,
-        ...     best_idx=1,
-        ...     generations=50,
-        ...     evaluations=2500
-        ... )
-        >>> best_x, best_fitness = result.best
-        >>> best_x
-        array([3., 4.])
-        >>> best_fitness
-        0.3
+    Examples
+    --------
+    >>> import numpy as np
+    >>> from ctrl_freak.population import Population
+    >>> from ctrl_freak.results import GAResult
+    >>> pop = Population(x=np.array([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]]))
+    >>> result = GAResult(
+    ...     population=pop,
+    ...     fitness=np.array([0.5, 0.3, 0.7]),
+    ...     best_idx=1,
+    ...     generations=50,
+    ...     evaluations=2500,
+    ... )
+    >>> result.best[1]
+    0.3
     """
 
     population: Population
@@ -158,9 +187,12 @@ class GAResult:
     def __post_init__(self) -> None:
         """Validate shapes and copy arrays for immutability.
 
-        Raises:
-            TypeError: If fitness is not a numpy array or best_idx is not an integer.
-            ValueError: If array shapes are inconsistent or best_idx is out of bounds.
+        Raises
+        ------
+        TypeError
+            If fitness is not a numpy array or best_idx is not an integer.
+        ValueError
+            If array shapes are inconsistent or best_idx is out of bounds.
         """
         n = len(self.population)
 
@@ -185,14 +217,29 @@ class GAResult:
     def best(self) -> tuple[np.ndarray, float]:
         """Extract the best individual and its fitness value.
 
-        Returns:
-            Tuple of (x, fitness) where x is the decision variables of the best
-            individual (shape (n_vars,)) and fitness is its fitness value.
+        Returns
+        -------
+        tuple[numpy.ndarray, float]
+            Decision variables and fitness value for the best individual.
 
-        Example:
-            >>> # Assuming result is a GAResult instance
-            >>> best_x, best_fitness = result.best
-            >>> print(f"Best solution: {best_x} with fitness {best_fitness}")
+        Examples
+        --------
+        >>> import numpy as np
+        >>> from ctrl_freak.population import Population
+        >>> from ctrl_freak.results import GAResult
+        >>> pop = Population(x=np.array([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]]))
+        >>> result = GAResult(
+        ...     population=pop,
+        ...     fitness=np.array([0.5, 0.3, 0.7]),
+        ...     best_idx=1,
+        ...     generations=1,
+        ...     evaluations=3,
+        ... )
+        >>> best_x, best_fitness = result.best
+        >>> best_x
+        array([3., 4.])
+        >>> best_fitness
+        0.3
         """
         best_x = self.population.x[self.best_idx]
         best_fitness = self.fitness[self.best_idx]

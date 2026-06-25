@@ -24,23 +24,40 @@ def select_parents(
     Uses the crowded comparison operator: lower rank wins, ties broken by
     higher crowding distance.
 
-    Args:
-        pop: Population (used for x values and population size).
-        n_parents: Number of parents to select.
-        rng: Random number generator for reproducibility.
-        rank: Pareto front ranks for all individuals. Shape (n,).
-        crowding_distance: Crowding distances for all individuals. Shape (n,).
+    Parameters
+    ----------
+    pop : Population
+        Population used for its size.
+    n_parents : int
+        Number of parents to select.
+    rng : numpy.random.Generator
+        Random number generator for reproducibility.
+    rank : numpy.ndarray
+        Pareto front ranks for all individuals. Shape is ``(n,)``.
+    crowding_distance : numpy.ndarray
+        Crowding distances for all individuals. Shape is ``(n,)``.
 
-    Returns:
-        Array of shape (n_parents,) containing indices into population.
+    Returns
+    -------
+    numpy.ndarray
+        Array of shape ``(n_parents,)`` containing indices into ``pop``.
 
-    Example:
-        >>> rng = np.random.default_rng(42)
-        >>> rank = non_dominated_sort(pop.objectives)
-        >>> cd = compute_crowding_distance(pop.objectives, rank)
-        >>> parents = select_parents(pop, n_parents=10, rng=rng, rank=rank, crowding_distance=cd)
-        >>> parents.shape
-        (10,)
+    Examples
+    --------
+    >>> import numpy as np
+    >>> from ctrl_freak.population import Population
+    >>> from ctrl_freak.operators.selection import select_parents
+    >>> pop = Population(x=np.zeros((4, 2)), objectives=np.zeros((4, 2)))
+    >>> rng = np.random.default_rng(0)
+    >>> parents = select_parents(
+    ...     pop,
+    ...     n_parents=10,
+    ...     rng=rng,
+    ...     rank=np.array([0, 0, 1, 1]),
+    ...     crowding_distance=np.array([1.0, 2.0, 1.0, 2.0]),
+    ... )
+    >>> parents.shape
+    (10,)
     """
     n = len(pop.x)
     candidates = rng.integers(0, n, size=(n_parents, 2))
@@ -70,31 +87,49 @@ def create_offspring(
     Selects 2*n_offspring parents using binary tournament, crosses them
     in pairs, and applies mutation to all offspring.
 
-    Args:
-        pop: Parent population.
-        n_offspring: Number of offspring to create.
-        crossover: User's crossover function.
-            Signature: (n_vars,), (n_vars,) -> (n_vars,)
-        mutate: User's mutation function.
-            Signature: (n_vars,) -> (n_vars,)
-        rng: Random number generator for reproducibility.
-        rank: Pareto front ranks for all individuals. Shape (n,).
-        crowding_distance: Crowding distances for all individuals. Shape (n,).
+    Parameters
+    ----------
+    pop : Population
+        Parent population.
+    n_offspring : int
+        Number of offspring to create.
+    crossover : Callable[[numpy.ndarray, numpy.ndarray], numpy.ndarray]
+        Crossover function with signature ``(n_vars,), (n_vars,) -> (n_vars,)``.
+    mutate : Callable[[numpy.ndarray], numpy.ndarray]
+        Mutation function with signature ``(n_vars,) -> (n_vars,)``.
+    rng : numpy.random.Generator
+        Random number generator for reproducibility.
+    rank : numpy.ndarray
+        Pareto front ranks for all individuals. Shape is ``(n,)``.
+    crowding_distance : numpy.ndarray
+        Crowding distances for all individuals. Shape is ``(n,)``.
 
-    Returns:
-        Array of shape (n_offspring, n_vars) containing offspring decision
-        variables (unevaluated).
+    Returns
+    -------
+    numpy.ndarray
+        Array of shape ``(n_offspring, n_vars)`` containing unevaluated
+        offspring decision variables.
 
-    Example:
-        >>> def simple_crossover(p1, p2):
-        ...     return (p1 + p2) / 2
-        >>> def simple_mutate(x):
-        ...     return x + 0.01 * np.random.randn(len(x))
-        >>> rank = non_dominated_sort(pop.objectives)
-        >>> cd = compute_crowding_distance(pop.objectives, rank)
-        >>> offspring = create_offspring(pop, 50, simple_crossover, simple_mutate, rng, rank, cd)
-        >>> offspring.shape
-        (50, n_vars)
+    Examples
+    --------
+    >>> import numpy as np
+    >>> from ctrl_freak.population import Population
+    >>> from ctrl_freak.operators.selection import create_offspring
+    >>> pop = Population(x=np.arange(8.0).reshape(4, 2), objectives=np.zeros((4, 2)))
+    >>> rng = np.random.default_rng(0)
+    >>> crossover = lambda p1, p2: (p1 + p2) / 2
+    >>> mutate = lambda x: x.copy()
+    >>> offspring = create_offspring(
+    ...     pop,
+    ...     n_offspring=3,
+    ...     crossover=crossover,
+    ...     mutate=mutate,
+    ...     rng=rng,
+    ...     rank=np.array([0, 0, 1, 1]),
+    ...     crowding_distance=np.array([1.0, 2.0, 1.0, 2.0]),
+    ... )
+    >>> offspring.shape
+    (3, 2)
     """
     parent_idx = select_parents(pop, n_offspring * 2, rng, rank=rank, crowding_distance=crowding_distance)
 
