@@ -7,10 +7,13 @@ Usage:
     uv run python benchmarks/zdt/run_benchmark.py
 """
 
+# ruff: noqa: E402
+
 import json
 import logging
 import sys
 import time
+from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -45,16 +48,28 @@ N_RUNS = 10
 SEEDS = list(range(N_RUNS))
 
 
-def run_ctrl_freak(problem_name: str, problem_fn: callable, seed: int) -> tuple[float, float]:
+def run_ctrl_freak(problem_name: str, problem_fn: Callable[[np.ndarray], np.ndarray], seed: int) -> tuple[float, float]:
     """Run NSGA-II using ctrl-freak library.
 
-    Args:
-        problem_name: Name of the problem (for logging).
-        problem_fn: The ZDT problem function.
-        seed: Random seed for reproducibility.
+    Parameters
+    ----------
+    problem_name : str
+        Name of the problem for logging.
+    problem_fn : collections.abc.Callable
+        ZDT problem function.
+    seed : int
+        Random seed for reproducibility.
 
-    Returns:
-        Tuple of (hypervolume, elapsed_time_seconds).
+    Returns
+    -------
+    tuple[float, float]
+        Hypervolume and elapsed time in seconds.
+
+    Examples
+    --------
+    >>> hv, elapsed = run_ctrl_freak("zdt1", PROBLEMS["zdt1"], seed=0)  # doctest: +SKIP
+    >>> hv >= 0.0 and elapsed >= 0.0
+    True
     """
     from ctrl_freak import nsga2, polynomial_mutation, sbx_crossover
 
@@ -83,7 +98,7 @@ def run_ctrl_freak(problem_name: str, problem_fn: callable, seed: int) -> tuple[
 class PymooZDTProblem(PymooProblem):
     """Wrapper to use ZDT functions with Pymoo."""
 
-    def __init__(self, problem_fn: callable) -> None:
+    def __init__(self, problem_fn: Callable[[np.ndarray], np.ndarray]) -> None:
         super().__init__(n_var=N_VARS, n_obj=2, xl=BOUNDS[0], xu=BOUNDS[1])
         self._problem_fn = problem_fn
 
@@ -93,16 +108,28 @@ class PymooZDTProblem(PymooProblem):
         out["F"] = f
 
 
-def run_pymoo(problem_name: str, problem_fn: callable, seed: int) -> tuple[float, float]:
+def run_pymoo(problem_name: str, problem_fn: Callable[[np.ndarray], np.ndarray], seed: int) -> tuple[float, float]:
     """Run NSGA-II using Pymoo library.
 
-    Args:
-        problem_name: Name of the problem (for logging).
-        problem_fn: The ZDT problem function.
-        seed: Random seed for reproducibility.
+    Parameters
+    ----------
+    problem_name : str
+        Name of the problem for logging.
+    problem_fn : collections.abc.Callable
+        ZDT problem function.
+    seed : int
+        Random seed for reproducibility.
 
-    Returns:
-        Tuple of (hypervolume, elapsed_time_seconds).
+    Returns
+    -------
+    tuple[float, float]
+        Hypervolume and elapsed time in seconds.
+
+    Examples
+    --------
+    >>> hv, elapsed = run_pymoo("zdt1", PROBLEMS["zdt1"], seed=0)  # doctest: +SKIP
+    >>> hv >= 0.0 and elapsed >= 0.0
+    True
     """
     problem = PymooZDTProblem(problem_fn)
 
@@ -131,7 +158,11 @@ def run_pymoo(problem_name: str, problem_fn: callable, seed: int) -> tuple[float
 
 
 def _setup_deap() -> None:
-    """Set up DEAP creator classes (handles cleanup for multiple runs)."""
+    """Set up DEAP creator classes.
+
+    Existing classes are removed first so repeated benchmark runs in one Python
+    process can recreate the same names.
+    """
     from deap import base, creator
 
     # Clean up any existing creator classes
@@ -145,16 +176,28 @@ def _setup_deap() -> None:
     creator.create("Individual", list, fitness=creator.FitnessMin)
 
 
-def run_deap(problem_name: str, problem_fn: callable, seed: int) -> tuple[float, float]:
+def run_deap(problem_name: str, problem_fn: Callable[[np.ndarray], np.ndarray], seed: int) -> tuple[float, float]:
     """Run NSGA-II using DEAP library.
 
-    Args:
-        problem_name: Name of the problem (for logging).
-        problem_fn: The ZDT problem function.
-        seed: Random seed for reproducibility.
+    Parameters
+    ----------
+    problem_name : str
+        Name of the problem for logging.
+    problem_fn : collections.abc.Callable
+        ZDT problem function.
+    seed : int
+        Random seed for reproducibility.
 
-    Returns:
-        Tuple of (hypervolume, elapsed_time_seconds).
+    Returns
+    -------
+    tuple[float, float]
+        Hypervolume and elapsed time in seconds.
+
+    Examples
+    --------
+    >>> hv, elapsed = run_deap("zdt1", PROBLEMS["zdt1"], seed=0)  # doctest: +SKIP
+    >>> hv >= 0.0 and elapsed >= 0.0
+    True
     """
     import random
 
@@ -250,8 +293,15 @@ def run_deap(problem_name: str, problem_fn: callable, seed: int) -> tuple[float,
 def run_benchmark() -> dict:
     """Run the full benchmark suite.
 
-    Returns:
-        Dictionary containing metadata and results.
+    Returns
+    -------
+    dict
+        Benchmark metadata and per-run results.
+
+    Examples
+    --------
+    >>> sorted(run_benchmark().keys())  # doctest: +SKIP
+    ['metadata', 'results']
     """
     timestamp = datetime.now(UTC).isoformat()
 
@@ -309,8 +359,17 @@ def run_benchmark() -> dict:
 def print_summary(results: dict) -> None:
     """Print a summary table of the benchmark results.
 
-    Args:
-        results: The benchmark results dictionary.
+    Parameters
+    ----------
+    results : dict
+        Benchmark results dictionary returned by :func:`run_benchmark`.
+
+    Examples
+    --------
+    >>> sample = {'results': [{'problem': 'ZDT1', 'library': 'ctrl-freak', 'hypervolume': 1.0, 'time_seconds': 0.1}]}
+    >>> print_summary(sample)
+    <BLANKLINE>
+    ...
     """
     # Organize results by problem and library
     from collections import defaultdict
@@ -379,7 +438,13 @@ def print_summary(results: dict) -> None:
 
 
 def main() -> None:
-    """Main entry point for the benchmark."""
+    """Run the benchmark and write live artifacts.
+
+    Examples
+    --------
+    >>> callable(main)
+    True
+    """
     logger.info("Starting ZDT benchmark suite")
     logger.info(f"Parameters: pop_size={POP_SIZE}, generations={N_GENERATIONS}, runs={N_RUNS}")
 

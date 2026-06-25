@@ -15,16 +15,29 @@ def hypervolume(objectives: np.ndarray, ref_point: np.ndarray | None = None) -> 
     dominated by the Pareto front approximation and bounded by a reference point.
     Higher values indicate better convergence and diversity.
 
-    Args:
-        objectives: (n, n_obj) objective values of the Pareto front approximation
-        ref_point: Reference point. Defaults to [1.1, 1.1] for ZDT problems,
-            which is slightly worse than the nadir point (1, 1).
+    Parameters
+    ----------
+    objectives : numpy.ndarray
+        Objective values of the Pareto front approximation with shape
+        ``(n, n_obj)``.
+    ref_point : numpy.ndarray, optional
+        Reference point. Defaults to ``[1.1, 1.1]`` for ZDT problems.
 
-    Returns:
-        Hypervolume value (higher is better for minimization problems)
+    Returns
+    -------
+    float
+        Hypervolume value. Higher is better for minimization problems.
 
-    Raises:
-        ValueError: If objectives array is empty or has wrong shape
+    Raises
+    ------
+    ValueError
+        If ``objectives`` is empty or is not two-dimensional.
+
+    Examples
+    --------
+    >>> objs = np.array([[0.2, 0.8], [0.8, 0.2]])
+    >>> round(hypervolume(objs, ref_point=np.array([1.1, 1.1])), 2)
+    0.45
     """
     if objectives.size == 0:
         raise ValueError("objectives array cannot be empty")

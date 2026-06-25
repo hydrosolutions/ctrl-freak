@@ -11,6 +11,7 @@ import pytest
 
 from ctrl_freak import crowding_distance as compute_crowding_distance
 from ctrl_freak.operators import create_offspring, lift, lift_parallel, select_parents
+from ctrl_freak.operators.standard import polynomial_mutation, sbx_crossover
 from ctrl_freak.population import Population
 
 # =============================================================================
@@ -22,6 +23,26 @@ from ctrl_freak.population import Population
 def rng() -> np.random.Generator:
     """Seeded random generator for reproducibility."""
     return np.random.default_rng(42)
+
+
+@pytest.fixture
+def default_bounds() -> tuple[float, float]:
+    """Default bounds for testing."""
+    return (0.0, 1.0)
+
+
+@pytest.fixture
+def custom_bounds() -> tuple[float, float]:
+    """Custom bounds for testing."""
+    return (-5.0, 5.0)
+
+
+@pytest.fixture
+def per_variable_bounds() -> tuple[np.ndarray, np.ndarray]:
+    """Per-variable bounds for 3 decision variables."""
+    lower = np.array([0.0, -10.0, 100.0])
+    upper = np.array([1.0, 10.0, 200.0])
+    return (lower, upper)
 
 
 def _compute_crowding_for_all_fronts(objectives: np.ndarray, ranks: np.ndarray) -> np.ndarray:
@@ -122,6 +143,603 @@ def tracking_mutate() -> tuple[callable, list]:
         return x + 0.01
 
     return mutate, calls
+
+
+# =============================================================================
+# TestPolynomialMutationDegenerateBounds
+# =============================================================================
+
+
+class TestPolynomialMutationDegenerateBounds:
+    """Regression tests for fixed variables in polynomial mutation."""
+
+    def test_lower_equals_upper_no_nan(self) -> None:
+        """A fixed variable (lower==upper) must never produce NaN via the real mutate path."""
+        lower = np.array([0.0, 5.0])
+        upper = np.array([1.0, 5.0])
+        mutate = polynomial_mutation(eta=20.0, prob=1.0, bounds=(lower, upper), seed=42)
+        x = np.array([0.5, 5.0])
+        out = mutate(x)
+        assert not np.any(np.isnan(out)), f"NaN produced: {out}"
+        np.testing.assert_array_equal(out[1], 5.0)
+        assert lower[0] <= out[0] <= upper[0]
+
+
+def test_legacy_shim_removed() -> None:
+    """The deprecated ctrl_freak.standard_operators shim is removed."""
+    import importlib
+
+    with pytest.raises(ModuleNotFoundError):
+        importlib.import_module("ctrl_freak.standard_operators")
+
+
+class TestSeedInjection:
+    """Contract tests for post-construction Generator injection."""
+
+    def test_set_rng_overrides_seed(self) -> None:
+        """Injected rng should replace the constructor seed for SBX."""
+        p1 = np.array([0.2, 0.4, 0.6])
+        p2 = np.array([0.3, 0.5, 0.7])
+        seeded = sbx_crossover(seed=1)
+        injected = sbx_crossover(seed=999)
+        injected.set_rng(np.random.default_rng(1))
+
+        np.testing.assert_array_equal(seeded(p1, p2), injected(p1, p2))
+
+    def test_set_rng_present_on_both_operators(self) -> None:
+        """Both standard operators expose the seed-injection hook."""
+        assert hasattr(sbx_crossover(), "set_rng")
+        assert hasattr(polynomial_mutation(), "set_rng")
+
+    def test_standalone_seed_path_preserved(self) -> None:
+        """Two standalone operators with the same seed produce the same sequence."""
+        p1 = np.array([0.2, 0.4, 0.6])
+        p2 = np.array([0.3, 0.5, 0.7])
+        crossover1 = sbx_crossover(seed=7)
+        crossover2 = sbx_crossover(seed=7)
+
+        children1 = [crossover1(p1, p2) for _ in range(5)]
+        children2 = [crossover2(p1, p2) for _ in range(5)]
+
+        for child1, child2 in zip(children1, children2, strict=True):
+            np.testing.assert_array_equal(child1, child2)
+
+    def test_injected_generator_advances(self) -> None:
+        """Injected generators advance across calls."""
+        p1 = np.array([0.2, 0.4, 0.6])
+        p2 = np.array([0.3, 0.5, 0.7])
+        crossover = sbx_crossover(seed=999)
+        crossover.set_rng(np.random.default_rng(1))
+
+        child1 = crossover(p1, p2)
+        child2 = crossover(p1, p2)
+
+        assert not np.allclose(child1, child2)
+
+    def test_set_rng_overrides_seed_mutation(self) -> None:
+        """Injected rng should replace the constructor seed for mutation."""
+        x = np.array([0.2, 0.4, 0.6])
+        seeded = polynomial_mutation(prob=1.0, seed=1)
+        injected = polynomial_mutation(prob=1.0, seed=999)
+        injected.set_rng(np.random.default_rng(1))
+
+        np.testing.assert_array_equal(seeded(x), injected(x))
+
+
+class TestSBXCrossover:
+    """Tests for SBX crossover operator."""
+
+    def test_returns_callable(self, default_bounds: tuple[float, float]) -> None:
+        """sbx_crossover should return a callable function."""
+        crossover = sbx_crossover(eta=15.0, bounds=default_bounds)
+
+        assert callable(crossover)
+
+    def test_returns_correct_shape(self, default_bounds: tuple[float, float]) -> None:
+        """Crossover should return array with same shape as parents."""
+        crossover = sbx_crossover(eta=15.0, bounds=default_bounds, seed=42)
+        p1 = np.array([0.2, 0.4, 0.6])
+        p2 = np.array([0.3, 0.5, 0.7])
+
+        child = crossover(p1, p2)
+
+        assert child.shape == p1.shape
+        assert child.shape == (3,)
+
+    def test_child_within_bounds(self, default_bounds: tuple[float, float]) -> None:
+        """Children should always be within specified bounds."""
+        lower, upper = default_bounds
+        crossover = sbx_crossover(eta=15.0, bounds=default_bounds, seed=42)
+
+        p1 = np.array([0.1, 0.9, 0.5])
+        p2 = np.array([0.8, 0.2, 0.5])
+
+        for _ in range(100):
+            child = crossover(p1, p2)
+            assert np.all(child >= lower), f"Child below lower bound: {child}"
+            assert np.all(child <= upper), f"Child above upper bound: {child}"
+
+    def test_child_within_custom_bounds(self, custom_bounds: tuple[float, float]) -> None:
+        """Children should respect custom bounds."""
+        lower, upper = custom_bounds
+        crossover = sbx_crossover(eta=15.0, bounds=custom_bounds, seed=42)
+
+        p1 = np.array([-4.0, 0.0, 4.0])
+        p2 = np.array([4.0, 0.0, -4.0])
+
+        for _ in range(100):
+            child = crossover(p1, p2)
+            assert np.all(child >= lower), f"Child below lower bound: {child}"
+            assert np.all(child <= upper), f"Child above upper bound: {child}"
+
+    def test_high_eta_produces_closer_children(self) -> None:
+        """Higher eta should produce children closer to parents."""
+        bounds = (0.0, 1.0)
+        n_samples = 500
+        seed = 42
+
+        p1 = np.array([0.3, 0.5, 0.7])
+        p2 = np.array([0.4, 0.6, 0.8])
+        parent_midpoint = (p1 + p2) / 2
+
+        low_eta_crossover = sbx_crossover(eta=2.0, bounds=bounds, seed=seed)
+        low_eta_distances = [np.linalg.norm(low_eta_crossover(p1, p2) - parent_midpoint) for _ in range(n_samples)]
+
+        high_eta_crossover = sbx_crossover(eta=50.0, bounds=bounds, seed=seed)
+        high_eta_distances = [np.linalg.norm(high_eta_crossover(p1, p2) - parent_midpoint) for _ in range(n_samples)]
+
+        avg_low_eta = np.mean(low_eta_distances)
+        avg_high_eta = np.mean(high_eta_distances)
+
+        assert avg_high_eta < avg_low_eta, (
+            f"High eta should produce closer children. Low eta avg: {avg_low_eta:.4f}, High eta avg: {avg_high_eta:.4f}"
+        )
+
+    def test_deterministic_with_seed(self, default_bounds: tuple[float, float]) -> None:
+        """Same seed should produce identical results."""
+        p1 = np.array([0.2, 0.4, 0.6])
+        p2 = np.array([0.3, 0.5, 0.7])
+
+        crossover1 = sbx_crossover(eta=15.0, bounds=default_bounds, seed=12345)
+        crossover2 = sbx_crossover(eta=15.0, bounds=default_bounds, seed=12345)
+
+        children1 = [crossover1(p1, p2) for _ in range(10)]
+        children2 = [crossover2(p1, p2) for _ in range(10)]
+
+        for c1, c2 in zip(children1, children2, strict=True):
+            np.testing.assert_array_equal(c1, c2)
+
+    def test_different_seeds_produce_different_results(self, default_bounds: tuple[float, float]) -> None:
+        """Different seeds should produce different results."""
+        p1 = np.array([0.2, 0.4, 0.6])
+        p2 = np.array([0.3, 0.5, 0.7])
+
+        crossover1 = sbx_crossover(eta=15.0, bounds=default_bounds, seed=111)
+        crossover2 = sbx_crossover(eta=15.0, bounds=default_bounds, seed=222)
+
+        assert not np.allclose(crossover1(p1, p2), crossover2(p1, p2))
+
+    def test_identical_parents(self, default_bounds: tuple[float, float]) -> None:
+        """When parents are identical, child should exactly equal the parent."""
+        crossover = sbx_crossover(eta=15.0, bounds=default_bounds, seed=42)
+        p = np.array([0.5, 0.5, 0.5])
+
+        for _ in range(50):
+            child = crossover(p, p)
+            np.testing.assert_array_equal(child, p)
+
+    def test_single_variable(self, default_bounds: tuple[float, float]) -> None:
+        """Should work with single-variable individuals."""
+        crossover = sbx_crossover(eta=15.0, bounds=default_bounds, seed=42)
+        p1 = np.array([0.2])
+        p2 = np.array([0.8])
+
+        child = crossover(p1, p2)
+
+        assert child.shape == (1,)
+        assert 0.0 <= child[0] <= 1.0
+
+    def test_extreme_parents_at_bounds(self, default_bounds: tuple[float, float]) -> None:
+        """Should handle parents at boundary values."""
+        crossover = sbx_crossover(eta=15.0, bounds=default_bounds, seed=42)
+        p1 = np.array([0.0, 0.0, 0.0])
+        p2 = np.array([1.0, 1.0, 1.0])
+
+        for _ in range(100):
+            child = crossover(p1, p2)
+            assert np.all(child >= 0.0)
+            assert np.all(child <= 1.0)
+
+    def test_child_within_per_variable_bounds(self, per_variable_bounds: tuple[np.ndarray, np.ndarray]) -> None:
+        """Children should respect element-wise per-variable bounds."""
+        lower, upper = per_variable_bounds
+        crossover = sbx_crossover(eta=15.0, bounds=per_variable_bounds, seed=42)
+
+        p1 = np.array([0.5, 0.0, 150.0])
+        p2 = np.array([0.8, -5.0, 180.0])
+
+        for _ in range(100):
+            child = crossover(p1, p2)
+            assert np.all(child >= lower), f"Child below lower bound: {child}"
+            assert np.all(child <= upper), f"Child above upper bound: {child}"
+
+    def test_per_variable_bounds_children_use_full_range(
+        self, per_variable_bounds: tuple[np.ndarray, np.ndarray]
+    ) -> None:
+        """With low eta and extreme parents, children should span most of each variable's range."""
+        lower, upper = per_variable_bounds
+        crossover = sbx_crossover(eta=2.0, bounds=per_variable_bounds, seed=42)
+
+        p1 = lower.copy()
+        p2 = upper.copy()
+        children = np.array([crossover(p1, p2) for _ in range(500)])
+
+        for i in range(len(lower)):
+            child_range = children[:, i].max() - children[:, i].min()
+            variable_range = upper[i] - lower[i]
+            assert child_range > 0.5 * variable_range, (
+                f"Variable {i}: children span {child_range:.4f} but variable range is {variable_range:.4f}"
+            )
+
+    def test_per_variable_bounds_deterministic_with_seed(
+        self, per_variable_bounds: tuple[np.ndarray, np.ndarray]
+    ) -> None:
+        """Same seed should produce identical children with array bounds."""
+        p1 = np.array([0.5, 0.0, 150.0])
+        p2 = np.array([0.8, -5.0, 180.0])
+
+        crossover1 = sbx_crossover(eta=15.0, bounds=per_variable_bounds, seed=12345)
+        crossover2 = sbx_crossover(eta=15.0, bounds=per_variable_bounds, seed=12345)
+
+        children1 = [crossover1(p1, p2) for _ in range(10)]
+        children2 = [crossover2(p1, p2) for _ in range(10)]
+
+        for c1, c2 in zip(children1, children2, strict=True):
+            np.testing.assert_array_equal(c1, c2)
+
+
+class TestPolynomialMutation:
+    """Tests for polynomial mutation operator."""
+
+    def test_returns_callable(self, default_bounds: tuple[float, float]) -> None:
+        """polynomial_mutation should return a callable function."""
+        mutate = polynomial_mutation(eta=20.0, bounds=default_bounds)
+
+        assert callable(mutate)
+
+    def test_returns_correct_shape(self, default_bounds: tuple[float, float]) -> None:
+        """Mutation should return array with same shape as input."""
+        mutate = polynomial_mutation(eta=20.0, bounds=default_bounds, seed=42)
+        x = np.array([0.2, 0.4, 0.6])
+
+        mutated = mutate(x)
+
+        assert mutated.shape == x.shape
+        assert mutated.shape == (3,)
+
+    def test_mutated_within_bounds(self, default_bounds: tuple[float, float]) -> None:
+        """Mutated values should always be within bounds."""
+        lower, upper = default_bounds
+        mutate = polynomial_mutation(eta=20.0, prob=1.0, bounds=default_bounds, seed=42)
+
+        x = np.array([0.1, 0.5, 0.9])
+
+        for _ in range(100):
+            mutated = mutate(x)
+            assert np.all(mutated >= lower), f"Below lower bound: {mutated}"
+            assert np.all(mutated <= upper), f"Above upper bound: {mutated}"
+
+    def test_mutated_within_custom_bounds(self, custom_bounds: tuple[float, float]) -> None:
+        """Mutated values should respect custom bounds."""
+        lower, upper = custom_bounds
+        mutate = polynomial_mutation(eta=20.0, prob=1.0, bounds=custom_bounds, seed=42)
+
+        x = np.array([-3.0, 0.0, 3.0])
+
+        for _ in range(100):
+            mutated = mutate(x)
+            assert np.all(mutated >= lower), f"Below lower bound: {mutated}"
+            assert np.all(mutated <= upper), f"Above upper bound: {mutated}"
+
+    def test_default_probability_is_one_over_n(self) -> None:
+        """Default mutation probability should be 1/n_vars."""
+        n_vars = 10
+        n_trials = 1000
+        mutate = polynomial_mutation(eta=20.0, prob=None, bounds=(0.0, 1.0), seed=42)
+        x = np.full(n_vars, 0.5)
+
+        total_changes = 0
+        for _ in range(n_trials):
+            mutated = mutate(x.copy())
+            total_changes += np.sum(mutated != x)
+
+        actual_avg = total_changes / n_trials
+        assert 0.5 < actual_avg < 2.0, f"Expected ~1.0 mutations, got {actual_avg:.2f}"
+
+    def test_high_probability_mutates_all(self) -> None:
+        """With prob=1.0, all variables should be mutated."""
+        n_vars = 5
+        n_trials = 50
+        mutate = polynomial_mutation(eta=20.0, prob=1.0, bounds=(0.0, 1.0), seed=42)
+        x = np.full(n_vars, 0.5)
+
+        change_counts = []
+        for _ in range(n_trials):
+            mutated = mutate(x)
+            change_counts.append(np.sum(mutated != x))
+
+        avg_changes = np.mean(change_counts)
+        assert avg_changes > 0.9 * n_vars, f"Expected ~{n_vars} changes, got {avg_changes:.1f}"
+
+    def test_zero_probability_no_changes(self) -> None:
+        """With prob=0.0, no variables should be mutated."""
+        mutate = polynomial_mutation(eta=20.0, prob=0.0, bounds=(0.0, 1.0), seed=42)
+        x = np.array([0.2, 0.4, 0.6, 0.8])
+
+        for _ in range(50):
+            mutated = mutate(x)
+            np.testing.assert_array_equal(mutated, x)
+
+    def test_high_eta_produces_smaller_mutations(self) -> None:
+        """Higher eta should produce smaller perturbations."""
+        bounds = (0.0, 1.0)
+        n_samples = 500
+        x = np.array([0.5, 0.5, 0.5])
+
+        low_eta_mutate = polynomial_mutation(eta=5.0, prob=1.0, bounds=bounds, seed=42)
+        low_eta_distances = [np.linalg.norm(low_eta_mutate(x) - x) for _ in range(n_samples)]
+
+        high_eta_mutate = polynomial_mutation(eta=100.0, prob=1.0, bounds=bounds, seed=42)
+        high_eta_distances = [np.linalg.norm(high_eta_mutate(x) - x) for _ in range(n_samples)]
+
+        avg_low_eta = np.mean(low_eta_distances)
+        avg_high_eta = np.mean(high_eta_distances)
+
+        assert avg_high_eta < avg_low_eta, (
+            f"High eta should produce smaller mutations. Low eta avg: {avg_low_eta:.4f}, "
+            f"High eta avg: {avg_high_eta:.4f}"
+        )
+
+    def test_deterministic_with_seed(self, default_bounds: tuple[float, float]) -> None:
+        """Same seed should produce identical results."""
+        x = np.array([0.2, 0.4, 0.6])
+
+        mutate1 = polynomial_mutation(eta=20.0, prob=1.0, bounds=default_bounds, seed=12345)
+        mutate2 = polynomial_mutation(eta=20.0, prob=1.0, bounds=default_bounds, seed=12345)
+
+        results1 = [mutate1(x) for _ in range(10)]
+        results2 = [mutate2(x) for _ in range(10)]
+
+        for r1, r2 in zip(results1, results2, strict=True):
+            np.testing.assert_array_equal(r1, r2)
+
+    def test_different_seeds_produce_different_results(self, default_bounds: tuple[float, float]) -> None:
+        """Different seeds should produce different results."""
+        x = np.array([0.2, 0.4, 0.6])
+
+        mutate1 = polynomial_mutation(eta=20.0, prob=1.0, bounds=default_bounds, seed=111)
+        mutate2 = polynomial_mutation(eta=20.0, prob=1.0, bounds=default_bounds, seed=222)
+
+        assert not np.allclose(mutate1(x), mutate2(x))
+
+    def test_does_not_modify_input(self, default_bounds: tuple[float, float]) -> None:
+        """Mutation should not modify the input array."""
+        mutate = polynomial_mutation(eta=20.0, prob=1.0, bounds=default_bounds, seed=42)
+        x = np.array([0.3, 0.5, 0.7])
+        x_original = x.copy()
+
+        _ = mutate(x)
+
+        np.testing.assert_array_equal(x, x_original)
+
+    def test_single_variable(self, default_bounds: tuple[float, float]) -> None:
+        """Should work with single-variable individuals."""
+        mutate = polynomial_mutation(eta=20.0, prob=1.0, bounds=default_bounds, seed=42)
+        x = np.array([0.5])
+
+        mutated = mutate(x)
+
+        assert mutated.shape == (1,)
+        assert 0.0 <= mutated[0] <= 1.0
+
+    def test_at_boundary_values(self, default_bounds: tuple[float, float]) -> None:
+        """Should handle values at boundary correctly."""
+        mutate = polynomial_mutation(eta=20.0, prob=1.0, bounds=default_bounds, seed=42)
+
+        x_lower = np.array([0.0, 0.0, 0.0])
+        x_upper = np.array([1.0, 1.0, 1.0])
+
+        for _ in range(50):
+            mutated_lower = mutate(x_lower)
+            mutated_upper = mutate(x_upper)
+
+            assert np.all(mutated_lower >= 0.0)
+            assert np.all(mutated_lower <= 1.0)
+            assert np.all(mutated_upper >= 0.0)
+            assert np.all(mutated_upper <= 1.0)
+
+    def test_mutated_within_per_variable_bounds(self, per_variable_bounds: tuple[np.ndarray, np.ndarray]) -> None:
+        """Mutated values should respect element-wise per-variable bounds."""
+        lower, upper = per_variable_bounds
+        mutate = polynomial_mutation(eta=20.0, prob=1.0, bounds=per_variable_bounds, seed=42)
+
+        x = np.array([0.5, 0.0, 150.0])
+
+        for _ in range(100):
+            mutated = mutate(x)
+            assert np.all(mutated >= lower), f"Below lower bound: {mutated}"
+            assert np.all(mutated <= upper), f"Above upper bound: {mutated}"
+
+    def test_per_variable_bounds_mutation_magnitude_scales(
+        self, per_variable_bounds: tuple[np.ndarray, np.ndarray]
+    ) -> None:
+        """Variable with range 100 should have >10x larger avg mutation than variable with range 1."""
+        mutate = polynomial_mutation(eta=20.0, prob=1.0, bounds=per_variable_bounds, seed=42)
+
+        x = np.array([0.5, 0.0, 150.0])
+        deltas = np.array([np.abs(mutate(x) - x) for _ in range(1000)])
+        avg_deltas = deltas.mean(axis=0)
+
+        assert avg_deltas[2] > 10.0 * avg_deltas[0], (
+            f"Expected variable 2 (range 100) to have >10x larger mutations than "
+            f"variable 0 (range 1). Got avg_deltas={avg_deltas}"
+        )
+
+    def test_per_variable_bounds_deterministic_with_seed(
+        self, per_variable_bounds: tuple[np.ndarray, np.ndarray]
+    ) -> None:
+        """Same seed should produce identical mutations with array bounds."""
+        x = np.array([0.5, 0.0, 150.0])
+
+        mutate1 = polynomial_mutation(eta=20.0, prob=1.0, bounds=per_variable_bounds, seed=12345)
+        mutate2 = polynomial_mutation(eta=20.0, prob=1.0, bounds=per_variable_bounds, seed=12345)
+
+        results1 = [mutate1(x) for _ in range(10)]
+        results2 = [mutate2(x) for _ in range(10)]
+
+        for r1, r2 in zip(results1, results2, strict=True):
+            np.testing.assert_array_equal(r1, r2)
+
+
+class TestStandardOperatorIntegration:
+    """Integration tests for standard operators with nsga2."""
+
+    def test_sbx_compatible_with_nsga2(self) -> None:
+        """SBX crossover should work with nsga2."""
+        from ctrl_freak import nsga2
+
+        n_vars = 5
+        bounds = (0.0, 1.0)
+
+        def init(rng: np.random.Generator) -> np.ndarray:
+            return rng.uniform(bounds[0], bounds[1], size=n_vars)
+
+        def evaluate(x: np.ndarray) -> np.ndarray:
+            return np.array([x.sum(), (1 - x).sum()])
+
+        crossover = sbx_crossover(eta=15.0, bounds=bounds, seed=42)
+
+        def mutate(x: np.ndarray) -> np.ndarray:
+            return np.clip(x + 0.01, bounds[0], bounds[1])
+
+        result = nsga2(
+            init=init,
+            evaluate=evaluate,
+            crossover=crossover,
+            mutate=mutate,
+            pop_size=20,
+            n_generations=5,
+            seed=42,
+        )
+
+        assert result.population.x.shape == (20, n_vars)
+        assert result.population.objectives.shape == (20, 2)
+        assert np.all(result.population.x >= bounds[0])
+        assert np.all(result.population.x <= bounds[1])
+
+    def test_polynomial_mutation_compatible_with_nsga2(self) -> None:
+        """Polynomial mutation should work with nsga2."""
+        from ctrl_freak import nsga2
+
+        n_vars = 5
+        bounds = (0.0, 1.0)
+
+        def init(rng: np.random.Generator) -> np.ndarray:
+            return rng.uniform(bounds[0], bounds[1], size=n_vars)
+
+        def evaluate(x: np.ndarray) -> np.ndarray:
+            return np.array([x.sum(), (1 - x).sum()])
+
+        def crossover(p1: np.ndarray, p2: np.ndarray) -> np.ndarray:
+            return (p1 + p2) / 2
+
+        mutate = polynomial_mutation(eta=20.0, bounds=bounds, seed=42)
+
+        result = nsga2(
+            init=init,
+            evaluate=evaluate,
+            crossover=crossover,
+            mutate=mutate,
+            pop_size=20,
+            n_generations=5,
+            seed=42,
+        )
+
+        assert result.population.x.shape == (20, n_vars)
+        assert result.population.objectives.shape == (20, 2)
+        assert np.all(result.population.x >= bounds[0])
+        assert np.all(result.population.x <= bounds[1])
+
+    def test_both_operators_together(self) -> None:
+        """Both standard operators should work together in nsga2."""
+        from ctrl_freak import non_dominated_sort, nsga2
+
+        n_vars = 10
+        bounds = (0.0, 1.0)
+
+        def init(rng: np.random.Generator) -> np.ndarray:
+            return rng.uniform(bounds[0], bounds[1], size=n_vars)
+
+        def evaluate(x: np.ndarray) -> np.ndarray:
+            f1 = x[0]
+            g = 1 + 9 * np.mean(x[1:])
+            f2 = g * (1 - np.sqrt(f1 / g))
+            return np.array([f1, f2])
+
+        crossover = sbx_crossover(eta=15.0, bounds=bounds, seed=100)
+        mutate = polynomial_mutation(eta=20.0, bounds=bounds, seed=200)
+
+        result = nsga2(
+            init=init,
+            evaluate=evaluate,
+            crossover=crossover,
+            mutate=mutate,
+            pop_size=50,
+            n_generations=20,
+            seed=42,
+        )
+
+        assert result.population.x.shape == (50, n_vars)
+        assert result.population.objectives.shape == (50, 2)
+        assert np.all(result.population.x >= bounds[0])
+        assert np.all(result.population.x <= bounds[1])
+
+        ranks = non_dominated_sort(result.population.objectives)
+        assert np.sum(ranks == 0) > 0
+
+    def test_both_operators_with_per_variable_bounds(self) -> None:
+        """Full NSGA-II run with per-variable array bounds should keep all individuals in bounds."""
+        from ctrl_freak import nsga2
+
+        lower = np.array([0.0, -10.0, 100.0])
+        upper = np.array([1.0, 10.0, 200.0])
+        bounds = (lower, upper)
+        n_vars = len(lower)
+
+        def init(rng: np.random.Generator) -> np.ndarray:
+            return rng.uniform(lower, upper)
+
+        def evaluate(x: np.ndarray) -> np.ndarray:
+            f1 = np.sum((x - lower) / (upper - lower))
+            f2 = np.sum((upper - x) / (upper - lower))
+            return np.array([f1, f2])
+
+        crossover = sbx_crossover(eta=15.0, bounds=bounds, seed=100)
+        mutate = polynomial_mutation(eta=20.0, bounds=bounds, seed=200)
+
+        result = nsga2(
+            init=init,
+            evaluate=evaluate,
+            crossover=crossover,
+            mutate=mutate,
+            pop_size=20,
+            n_generations=10,
+            seed=42,
+        )
+
+        assert result.population.x.shape == (20, n_vars)
+        assert np.all(result.population.x >= lower), "Some individuals below lower bounds"
+        assert np.all(result.population.x <= upper), "Some individuals above upper bounds"
 
 
 # =============================================================================

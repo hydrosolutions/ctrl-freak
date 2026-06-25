@@ -1,12 +1,4 @@
-"""NSGA-II Pareto-based primitives for ranking and diversity.
-
-This module provides the core pure functions for Pareto-based multi-objective
-optimization used in NSGA-II:
-- dominates: scalar Pareto dominance check
-- dominates_matrix: vectorized pairwise dominance
-- non_dominated_sort: Deb's fast non-dominated sorting algorithm
-- crowding_distance: diversity metric for solutions in a Pareto front
-"""
+"""Pareto-based ranking and diversity primitives for NSGA-II."""
 
 import numpy as np
 
@@ -14,22 +6,27 @@ import numpy as np
 def dominates(a: np.ndarray, b: np.ndarray) -> bool:
     """Check if solution a Pareto-dominates solution b (minimization).
 
-    A solution a dominates b if and only if:
-      - a[i] <= b[i] for ALL objectives (a is at least as good everywhere)
-      - a[i] < b[i] for AT LEAST ONE objective (a is strictly better somewhere)
+    A solution ``a`` dominates ``b`` when it is no worse in every objective
+    and strictly better in at least one objective.
 
-    Args:
-        a: Objective values for solution a. Shape (n_obj,).
-        b: Objective values for solution b. Shape (n_obj,).
+    Parameters
+    ----------
+    a : numpy.ndarray
+        Objective values for solution ``a`` with shape ``(n_obj,)``.
+    b : numpy.ndarray
+        Objective values for solution ``b`` with shape ``(n_obj,)``.
 
-    Returns:
-        True if a dominates b, False otherwise.
+    Returns
+    -------
+    bool
+        ``True`` if ``a`` dominates ``b``.
 
-    Examples:
-        >>> dominates(np.array([1.0, 2.0]), np.array([2.0, 3.0]))
-        True
-        >>> dominates(np.array([1.0, 3.0]), np.array([2.0, 2.0]))
-        False
+    Examples
+    --------
+    >>> dominates(np.array([1.0, 2.0]), np.array([2.0, 3.0]))
+    True
+    >>> dominates(np.array([1.0, 3.0]), np.array([2.0, 2.0]))
+    False
     """
     return bool(np.all(a <= b) and np.any(a < b))
 
@@ -40,20 +37,32 @@ def dominates_matrix(objectives: np.ndarray) -> np.ndarray:
     Uses broadcasting to efficiently compute whether individual i dominates
     individual j for all pairs (i, j).
 
-    Args:
-        objectives: Objective values for all individuals. Shape (n, n_obj).
+    Parameters
+    ----------
+    objectives : numpy.ndarray
+        Objective values for all individuals with shape ``(n, n_obj)``.
 
-    Returns:
-        Boolean array of shape (n, n) where result[i, j] = True iff
-        individual i dominates individual j.
+    Returns
+    -------
+    numpy.ndarray
+        Boolean array of shape ``(n, n)`` where ``result[i, j]`` is ``True``
+        iff individual ``i`` dominates individual ``j``.
 
-    Examples:
-        >>> objs = np.array([[1.0, 1.0], [2.0, 2.0], [1.0, 2.0]])
-        >>> dom = dominates_matrix(objs)
-        >>> dom[0, 1]  # Does [1,1] dominate [2,2]?
-        True
-        >>> dom[0, 2]  # Does [1,1] dominate [1,2]?
-        True
+    Notes
+    -----
+    This implementation materializes an intermediate broadcast tensor with
+    memory complexity ``O(N^2 * M)`` for ``N`` individuals and ``M`` objectives.
+    The result is correct and vectorized; for very large ``N`` or ``M``, prefer
+    a chunked reduction.
+
+    Examples
+    --------
+    >>> objs = np.array([[1.0, 1.0], [2.0, 2.0], [1.0, 2.0]])
+    >>> dom = dominates_matrix(objs)
+    >>> bool(dom[0, 1])  # Does [1,1] dominate [2,2]?
+    True
+    >>> bool(dom[0, 2])  # Does [1,1] dominate [1,2]?
+    True
     """
     # Reshape for broadcasting: (n, 1, n_obj) vs (1, n, n_obj)
     a = objectives[:, np.newaxis, :]  # (n, 1, n_obj)
@@ -72,20 +81,25 @@ def non_dominated_sort(objectives: np.ndarray) -> np.ndarray:
     """Assign each individual to a Pareto front using Deb's fast algorithm.
 
     Implements the fast non-dominated sorting algorithm from NSGA-II.
-    Time complexity: O(M * N^2) where M = number of objectives, N = population size.
+    The time complexity is ``O(M * N^2)`` where ``M`` is the number of
+    objectives and ``N`` is the population size.
 
-    Args:
-        objectives: Objective values for all individuals. Shape (n, n_obj).
+    Parameters
+    ----------
+    objectives : numpy.ndarray
+        Objective values for all individuals with shape ``(n, n_obj)``.
 
-    Returns:
-        Integer array of shape (n,) where rank[i] is the front index for
-        individual i. Rank 0 = Pareto optimal (first front), rank 1 = second
-        front, etc.
+    Returns
+    -------
+    numpy.ndarray
+        Integer array of shape ``(n,)`` where ``rank[i]`` is the front index
+        for individual ``i``. Rank 0 is the first Pareto front.
 
-    Examples:
-        >>> objs = np.array([[1.0, 1.0], [2.0, 2.0], [3.0, 3.0]])
-        >>> non_dominated_sort(objs)
-        array([0, 1, 2])
+    Examples
+    --------
+    >>> objs = np.array([[1.0, 1.0], [2.0, 2.0], [3.0, 3.0]])
+    >>> non_dominated_sort(objs)
+    array([0, 1, 2])
     """
     n = objectives.shape[0]
 
@@ -144,19 +158,24 @@ def crowding_distance(front_objectives: np.ndarray) -> np.ndarray:
     infinite distance. Interior solutions receive the sum of normalized
     neighbor distances across all objectives.
 
-    Args:
-        front_objectives: Objective values for individuals in ONE front only.
-            Shape (n_front, n_obj).
+    Parameters
+    ----------
+    front_objectives : numpy.ndarray
+        Objective values for individuals in one front only, with shape
+        ``(n_front, n_obj)``.
 
-    Returns:
-        Array of shape (n_front,) containing crowding distances.
-        Higher values indicate more isolated (preferred) solutions.
+    Returns
+    -------
+    numpy.ndarray
+        Array of shape ``(n_front,)`` containing crowding distances. Higher
+        values indicate more isolated solutions.
 
-    Examples:
-        >>> objs = np.array([[1.0, 4.0], [2.0, 3.0], [3.0, 2.0], [4.0, 1.0]])
-        >>> cd = crowding_distance(objs)
-        >>> np.isinf(cd[0]) and np.isinf(cd[-1])  # Boundary points
-        True
+    Examples
+    --------
+    >>> objs = np.array([[1.0, 4.0], [2.0, 3.0], [3.0, 2.0], [4.0, 1.0]])
+    >>> cd = crowding_distance(objs)
+    >>> bool(np.isinf(cd[0]) and np.isinf(cd[-1]))  # Boundary points
+    True
     """
     n_front = front_objectives.shape[0]
 

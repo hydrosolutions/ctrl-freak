@@ -1,14 +1,17 @@
-"""Standard genetic operators for NSGA-II.
+"""Standard bounded genetic operators for NSGA-II.
 
-This module provides well-known genetic operators commonly used in evolutionary
-multi-objective optimization:
+This module provides Simulated Binary Crossover (SBX) and polynomial mutation
+operators for real-valued decision vectors.
 
-- SBX (Simulated Binary Crossover): A crossover operator that simulates
-  single-point crossover behavior for real-valued variables
-- Polynomial Mutation: A bounded mutation operator with controllable spread
-
-Both operators are implemented as factory functions that return operator
-functions compatible with the nsga2() interface.
+Seed-injection contract (consumed by the algorithm layer): `sbx_crossover(...)`
+and `polynomial_mutation(...)` return callable operator objects. Each exposes
+`set_rng(rng: numpy.random.Generator) -> None`, which replaces the operator's
+internal generator. Until `set_rng` is called, the operator uses the generator
+built from its constructor `seed=`. The call signatures are unchanged:
+`crossover(p1, p2) -> child`, `mutate(x) -> x'`. Algorithms unify
+reproducibility by calling `set_rng` with a `SeedSequence.spawn`-derived
+generator after constructing operators; standalone users may ignore `set_rng`
+and rely on `seed=`.
 """
 
 from collections.abc import Callable
@@ -19,9 +22,149 @@ Bounds = tuple[float, float] | tuple[np.ndarray, np.ndarray]
 """Bounds for decision variables.
 
 A scalar pair ``(lower, upper)`` applies the same bounds to all variables.
-A pair of arrays ``(lower_array, upper_array)`` specifies per-variable bounds;
-each array must have the same length as the decision vector.
+A pair of arrays ``(lower_array, upper_array)`` specifies per-variable bounds.
 """
+
+
+class _SeededOperator:
+    """Mixin providing an injectable numpy Generator for genetic operators.
+
+    The operator owns a ``numpy.random.Generator`` built from ``seed`` at
+    construction. An orchestrating algorithm may replace it post-construction
+    via :meth:`set_rng` so a single master seed reproduces the entire run.
+    """
+
+    _rng: np.random.Generator
+
+    def set_rng(self, rng: np.random.Generator) -> None:
+        """Inject a numpy Generator, replacing the operator's internal RNG.
+
+        Parameters
+        ----------
+        rng : numpy.random.Generator
+            Generator to use for all subsequent draws. Replaces the generator
+            built from the constructor ``seed``.
+        """
+        self._rng = rng
+
+
+class _SBXCrossover(_SeededOperator):
+    """Callable bounded Simulated Binary Crossover operator."""
+
+    def __init__(self, eta: float, bounds: Bounds, seed: int | None) -> None:
+        self.eta = float(eta)
+        self.bounds = bounds
+        self._rng = np.random.default_rng(seed)
+
+    def __call__(self, p1: np.ndarray, p2: np.ndarray) -> np.ndarray:
+        """Apply bounded SBX to two parents and return one child.
+
+        Parameters
+        ----------
+        p1 : numpy.ndarray
+            First parent decision vector.
+        p2 : numpy.ndarray
+            Second parent decision vector.
+
+        Returns
+        -------
+        numpy.ndarray
+            One child decision vector with the same shape as ``p1``.
+        """
+        eps = 1e-14
+        eta = self.eta
+        exponent = 1.0 / (eta + 1.0)
+        rng = self._rng
+
+        lower, upper = self.bounds
+        xl = np.broadcast_to(np.asarray(lower, dtype=float), p1.shape)
+        xu = np.broadcast_to(np.asarray(upper, dtype=float), p1.shape)
+
+        sm = p1 < p2
+        y1 = np.where(sm, p1, p2)
+        y2 = np.where(sm, p2, p1)
+
+        eligible = (np.abs(p1 - p2) > eps) & (xl < xu)
+        delta = np.where(eligible, y2 - y1, 1.0)
+
+        rand = rng.random(p1.shape[0])
+
+        def calc_betaq(beta: np.ndarray) -> np.ndarray:
+            alpha = 2.0 - np.power(beta, -(eta + 1.0))
+            mask = rand <= (1.0 / alpha)
+            return np.where(
+                mask,
+                np.power(rand * alpha, exponent),
+                np.power(1.0 / (2.0 - rand * alpha), exponent),
+            )
+
+        beta1 = 1.0 + (2.0 * (y1 - xl) / delta)
+        c1 = 0.5 * ((y1 + y2) - calc_betaq(beta1) * delta)
+
+        beta2 = 1.0 + (2.0 * (xu - y2) / delta)
+        c2 = 0.5 * ((y1 + y2) + calc_betaq(beta2) * delta)
+
+        child_for_p1 = np.where(sm, c1, c2)
+        child_for_p2 = np.where(sm, c2, c1)
+        child = np.where(rng.random(p1.shape[0]) < 0.5, child_for_p1, child_for_p2)
+        child = np.where(eligible, child, p1)
+        return np.clip(child, xl, xu)
+
+
+class _PolynomialMutation(_SeededOperator):
+    """Callable bounded polynomial mutation operator."""
+
+    def __init__(self, eta: float, prob: float | None, bounds: Bounds, seed: int | None) -> None:
+        self.eta = float(eta)
+        self.prob = prob
+        self.bounds = bounds
+        self._rng = np.random.default_rng(seed)
+
+    def __call__(self, x: np.ndarray) -> np.ndarray:
+        """Apply polynomial mutation to an individual.
+
+        Parameters
+        ----------
+        x : numpy.ndarray
+            Decision vector to mutate.
+
+        Returns
+        -------
+        numpy.ndarray
+            Mutated decision vector with the same shape as ``x``.
+        """
+        n_vars = len(x)
+        mutation_prob = self.prob if self.prob is not None else 1.0 / n_vars
+        mutation_mask = self._rng.random(n_vars) < mutation_prob
+
+        if not np.any(mutation_mask):
+            return x.copy()
+
+        lower, upper = self.bounds
+        lower_arr = np.broadcast_to(np.asarray(lower, dtype=float), x.shape)
+        upper_arr = np.broadcast_to(np.asarray(upper, dtype=float), x.shape)
+        delta_max = upper_arr - lower_arr
+        degenerate = delta_max == 0
+        safe_delta = np.where(degenerate, 1.0, delta_max)
+
+        delta_l = (x - lower_arr) / safe_delta
+        delta_r = (upper_arr - x) / safe_delta
+
+        u = self._rng.random(n_vars)
+
+        xy_left = 1.0 - delta_l
+        val_left = 2.0 * u + (1.0 - 2.0 * u) * (xy_left ** (self.eta + 1.0))
+        delta_q_left = val_left ** (1.0 / (self.eta + 1.0)) - 1.0
+
+        xy_right = 1.0 - delta_r
+        val_right = 2.0 * (1.0 - u) + 2.0 * (u - 0.5) * (xy_right ** (self.eta + 1.0))
+        delta_q_right = 1.0 - val_right ** (1.0 / (self.eta + 1.0))
+
+        delta_q = np.where(u < 0.5, delta_q_left, delta_q_right)
+
+        effective_mask = mutation_mask & ~degenerate
+        mutated = np.where(effective_mask, x + delta_q * delta_max, x)
+        return np.clip(mutated, lower_arr, upper_arr)
 
 
 def sbx_crossover(
@@ -29,70 +172,56 @@ def sbx_crossover(
     bounds: Bounds = (0.0, 1.0),
     seed: int | None = None,
 ) -> Callable[[np.ndarray, np.ndarray], np.ndarray]:
-    """Create a Simulated Binary Crossover (SBX) operator.
+    """Create a bounded Simulated Binary Crossover operator.
 
-    SBX simulates single-point crossover behavior for real-valued variables.
-    It produces children whose distribution around the parent values is
-    controlled by the distribution index eta.
+    Parameters
+    ----------
+    eta : float, default=15.0
+        Distribution index. Higher values produce children closer to parents.
+    bounds : tuple, default=(0.0, 1.0)
+        Lower and upper decision-variable bounds. Scalars apply to all
+        variables; arrays provide per-variable bounds.
+    seed : int, optional
+        Random seed for the standalone generator used until ``set_rng`` is
+        called.
 
-    Args:
-        eta: Distribution index (default 15.0). Higher values produce children
-            closer to parents; lower values allow more exploration.
-            Typical range: 2-20.
-        bounds: Lower and upper bounds for decision variables (default (0.0, 1.0)).
-            Children are clipped to these bounds. Can be either:
-            - A scalar pair ``(lower, upper)`` applied uniformly to all variables.
-            - A pair of arrays ``(lower_array, upper_array)`` for per-variable
-              bounds, where each array has the same length as the decision vector.
-        seed: Random seed for reproducibility. If None, uses a random seed.
+    Returns
+    -------
+    collections.abc.Callable
+        Callable with signature ``(p1, p2) -> child``. The returned object also
+        exposes ``set_rng(rng)`` for algorithm-level seed injection.
 
-    Returns:
-        A crossover function with signature (p1, p2) -> child that is
-        compatible with nsga2()'s crossover parameter.
+    References
+    ----------
+    Deb, K., & Agrawal, R. B. (1995). Simulated binary crossover for
+    continuous search space. Complex Systems, 9(2), 115-148.
 
-    Example:
-        >>> crossover = sbx_crossover(eta=15.0, bounds=(0.0, 1.0), seed=42)
-        >>> p1 = np.array([0.2, 0.4, 0.6])
-        >>> p2 = np.array([0.3, 0.5, 0.7])
-        >>> child = crossover(p1, p2)
-        >>> child.shape
-        (3,)
+    Examples
+    --------
+    >>> crossover = sbx_crossover(eta=15.0, bounds=(0.0, 1.0), seed=42)
+    >>> p1 = np.array([0.2, 0.4, 0.6])
+    >>> p2 = np.array([0.3, 0.5, 0.7])
+    >>> child = crossover(p1, p2)
+    >>> child.shape
+    (3,)
 
-        Per-variable bounds:
+    Per-variable bounds:
 
-        >>> lower = np.array([0.0, -10.0, 100.0])
-        >>> upper = np.array([1.0,  10.0, 200.0])
-        >>> crossover = sbx_crossover(eta=15.0, bounds=(lower, upper), seed=42)
+    >>> lower = np.array([0.0, -10.0, 100.0])
+    >>> upper = np.array([1.0, 10.0, 200.0])
+    >>> crossover = sbx_crossover(eta=15.0, bounds=(lower, upper), seed=42)
+    >>> crossover(np.array([0.5, 0.0, 150.0]), np.array([0.8, -5.0, 180.0])).shape
+    (3,)
 
-    References:
-        Deb, K., & Agrawal, R. B. (1995). Simulated binary crossover for
-        continuous search space. Complex Systems, 9(2), 115-148.
+    Seed injection:
+
+    >>> cx = sbx_crossover(eta=15.0, bounds=(0.0, 1.0), seed=0)
+    >>> cx.set_rng(np.random.default_rng(123))
+    >>> child = cx(np.array([0.2, 0.4]), np.array([0.6, 0.8]))
+    >>> child.shape
+    (2,)
     """
-    rng = np.random.default_rng(seed)
-
-    def crossover(p1: np.ndarray, p2: np.ndarray) -> np.ndarray:
-        """Apply SBX crossover to two parents, returning one child."""
-        n_vars = len(p1)
-
-        # Generate all random values at once
-        u = rng.random(n_vars)
-
-        # Compute beta using vectorized conditional
-        exponent = 1.0 / (eta + 1.0)
-        beta = np.where(u <= 0.5, (2.0 * u) ** exponent, (1.0 / (2.0 * (1.0 - u))) ** exponent)
-
-        # Compute both symmetric children
-        c1 = 0.5 * ((1.0 + beta) * p1 + (1.0 - beta) * p2)
-        c2 = 0.5 * ((1.0 - beta) * p1 + (1.0 + beta) * p2)
-
-        # Randomly select c1 or c2 for each variable
-        child = np.where(rng.random(n_vars) < 0.5, c1, c2)
-
-        # Enforce bounds
-        lower, upper = bounds
-        return np.clip(child, lower, upper)
-
-    return crossover
+    return _SBXCrossover(eta=eta, bounds=bounds, seed=seed)
 
 
 def polynomial_mutation(
@@ -101,85 +230,46 @@ def polynomial_mutation(
     bounds: Bounds = (0.0, 1.0),
     seed: int | None = None,
 ) -> Callable[[np.ndarray], np.ndarray]:
-    """Create a polynomial mutation operator.
+    """Create a bounded polynomial mutation operator.
 
-    Polynomial mutation applies a bounded perturbation to each variable
-    with probability prob. The spread of the mutation is controlled by
-    the distribution index eta.
+    Parameters
+    ----------
+    eta : float, default=20.0
+        Distribution index. Higher values produce smaller perturbations.
+    prob : float, optional
+        Mutation probability per variable. If omitted, uses ``1 / n_vars``.
+    bounds : tuple, default=(0.0, 1.0)
+        Lower and upper decision-variable bounds. Scalars apply to all
+        variables; arrays provide per-variable bounds.
+    seed : int, optional
+        Random seed for the standalone generator used until ``set_rng`` is
+        called.
 
-    Args:
-        eta: Distribution index (default 20.0). Higher values produce smaller
-            perturbations (more local search); lower values allow larger jumps.
-            Typical range: 20-100.
-        prob: Mutation probability per variable (default None, which uses 1/n_vars).
-            If specified, each variable is mutated with this probability.
-        bounds: Lower and upper bounds for decision variables (default (0.0, 1.0)).
-            Mutations respect these bounds. Can be either:
-            - A scalar pair ``(lower, upper)`` applied uniformly to all variables.
-            - A pair of arrays ``(lower_array, upper_array)`` for per-variable
-              bounds, where each array has the same length as the decision vector.
-        seed: Random seed for reproducibility. If None, uses a random seed.
+    Returns
+    -------
+    collections.abc.Callable
+        Callable with signature ``x -> x'``. The returned object also exposes
+        ``set_rng(rng)`` for algorithm-level seed injection.
 
-    Returns:
-        A mutation function with signature (x) -> x' that is compatible
-        with nsga2()'s mutate parameter.
+    References
+    ----------
+    Deb, K., & Goyal, M. (1996). A combined genetic adaptive search (GeneAS)
+    for engineering design. Computer Science and Informatics, 26(4), 30-45.
 
-    Example:
-        >>> mutate = polynomial_mutation(eta=20.0, prob=0.1, bounds=(0.0, 1.0), seed=42)
-        >>> x = np.array([0.5, 0.5, 0.5])
-        >>> mutated = mutate(x)
-        >>> mutated.shape
-        (3,)
+    Examples
+    --------
+    >>> mutate = polynomial_mutation(eta=20.0, prob=0.1, bounds=(0.0, 1.0), seed=42)
+    >>> x = np.array([0.5, 0.5, 0.5])
+    >>> mutated = mutate(x)
+    >>> mutated.shape
+    (3,)
 
-        Per-variable bounds:
+    Per-variable bounds:
 
-        >>> lower = np.array([0.0, -10.0, 100.0])
-        >>> upper = np.array([1.0,  10.0, 200.0])
-        >>> mutate = polynomial_mutation(eta=20.0, prob=0.1, bounds=(lower, upper), seed=42)
-
-    References:
-        Deb, K., & Goyal, M. (1996). A combined genetic adaptive search (GeneAS)
-        for engineering design. Computer Science and Informatics, 26(4), 30-45.
+    >>> lower = np.array([0.0, -10.0, 100.0])
+    >>> upper = np.array([1.0, 10.0, 200.0])
+    >>> mutate = polynomial_mutation(eta=20.0, prob=0.1, bounds=(lower, upper), seed=42)
+    >>> mutate(np.array([0.5, 0.0, 150.0])).shape
+    (3,)
     """
-    rng = np.random.default_rng(seed)
-    lower, upper = bounds
-    delta_max = upper - lower
-
-    def mutate(x: np.ndarray) -> np.ndarray:
-        """Apply polynomial mutation to an individual (vectorized)."""
-        n_vars = len(x)
-        mutation_prob = prob if prob is not None else 1.0 / n_vars
-
-        # Generate mutation mask for all variables at once
-        mutation_mask = rng.random(n_vars) < mutation_prob
-
-        # Early exit if no mutations needed
-        if not np.any(mutation_mask):
-            return x.copy()
-
-        # Normalized distances to bounds
-        delta_l = (x - lower) / delta_max
-        delta_r = (upper - x) / delta_max
-
-        # Random values for mutation direction
-        u = rng.random(n_vars)
-
-        # Compute delta_q for both branches (mutation towards lower/upper bound)
-        xy_left = 1.0 - delta_l
-        val_left = 2.0 * u + (1.0 - 2.0 * u) * (xy_left ** (eta + 1.0))
-        delta_q_left = val_left ** (1.0 / (eta + 1.0)) - 1.0
-
-        xy_right = 1.0 - delta_r
-        val_right = 2.0 * (1.0 - u) + 2.0 * (u - 0.5) * (xy_right ** (eta + 1.0))
-        delta_q_right = 1.0 - val_right ** (1.0 / (eta + 1.0))
-
-        # Select appropriate delta_q based on u value
-        delta_q = np.where(u < 0.5, delta_q_left, delta_q_right)
-
-        # Apply mutations only where mask is True
-        mutated = np.where(mutation_mask, x + delta_q * delta_max, x)
-
-        # Ensure bounds are respected (numerical safety)
-        return np.clip(mutated, lower, upper)
-
-    return mutate
+    return _PolynomialMutation(eta=eta, prob=prob, bounds=bounds, seed=seed)

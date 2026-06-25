@@ -6,9 +6,11 @@ multi-objective evolutionary algorithms. All problems have:
 - 2 objectives to minimize
 - Known Pareto-optimal fronts for validation
 
-References:
-    Zitzler, E., Deb, K., & Thiele, L. (2000). Comparison of multiobjective
-    evolutionary algorithms: Empirical results. Evolutionary computation, 8(2), 173-195.
+References
+----------
+Zitzler, E., Deb, K., & Thiele, L. (2000). Comparison of multiobjective
+evolutionary algorithms: Empirical results. Evolutionary Computation, 8(2),
+173-195.
 """
 
 from collections.abc import Callable
@@ -26,11 +28,20 @@ def zdt1(x: np.ndarray) -> np.ndarray:
     The Pareto-optimal front is formed by x_i = 0 for i > 1,
     resulting in f2 = 1 - sqrt(f1).
 
-    Args:
-        x: Decision variables (n_vars,), all in [0, 1]
+    Parameters
+    ----------
+    x : numpy.ndarray
+        Decision variables with shape ``(n_vars,)`` and values in ``[0, 1]``.
 
-    Returns:
-        Objectives (2,) to minimize
+    Returns
+    -------
+    numpy.ndarray
+        Two objectives to minimize.
+
+    Examples
+    --------
+    >>> zdt1(np.zeros(N_VARS))
+    array([0., 1.])
     """
     n = len(x)
     f1 = x[0]
@@ -46,11 +57,20 @@ def zdt2(x: np.ndarray) -> np.ndarray:
     The Pareto-optimal front is formed by x_i = 0 for i > 1,
     resulting in f2 = 1 - (f1)^2.
 
-    Args:
-        x: Decision variables (n_vars,), all in [0, 1]
+    Parameters
+    ----------
+    x : numpy.ndarray
+        Decision variables with shape ``(n_vars,)`` and values in ``[0, 1]``.
 
-    Returns:
-        Objectives (2,) to minimize
+    Returns
+    -------
+    numpy.ndarray
+        Two objectives to minimize.
+
+    Examples
+    --------
+    >>> zdt2(np.zeros(N_VARS))
+    array([0., 1.])
     """
     n = len(x)
     f1 = x[0]
@@ -66,11 +86,20 @@ def zdt3(x: np.ndarray) -> np.ndarray:
     The Pareto front consists of several disconnected convex parts
     due to the sine term in the h function.
 
-    Args:
-        x: Decision variables (n_vars,), all in [0, 1]
+    Parameters
+    ----------
+    x : numpy.ndarray
+        Decision variables with shape ``(n_vars,)`` and values in ``[0, 1]``.
 
-    Returns:
-        Objectives (2,) to minimize
+    Returns
+    -------
+    numpy.ndarray
+        Two objectives to minimize.
+
+    Examples
+    --------
+    >>> zdt3(np.zeros(N_VARS))
+    array([0., 1.])
     """
     n = len(x)
     f1 = x[0]
