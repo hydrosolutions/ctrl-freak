@@ -13,13 +13,23 @@ def truncation_survival():
     Truncation survival keeps the k best individuals by fitness value.
     Lower fitness is better (minimization).
 
-    Returns:
-        A SurvivorSelector callable.
+    Returns
+    -------
+    callable
+        Survivor selector callable.
 
-    Example:
-        >>> selector = truncation_survival()
-        >>> indices, state = selector(pop, n_survivors=10)
-        >>> state['fitness']  # fitness values of survivors
+    Examples
+    --------
+    >>> import numpy as np
+    >>> from ctrl_freak.population import Population
+    >>> from ctrl_freak.survival.truncation import truncation_survival
+    >>> obj = np.array([[4.0], [2.0], [3.0], [1.0]])
+    >>> pop = Population(x=np.zeros((4, 1)), objectives=obj)
+    >>> indices, state = truncation_survival()(pop, n_survivors=2)
+    >>> indices
+    array([3, 1])
+    >>> state["fitness"].shape
+    (2,)
     """
 
     def selector(
@@ -29,49 +39,50 @@ def truncation_survival():
     ) -> tuple[np.ndarray, dict[str, np.ndarray]]:
         """Select survivors using truncation selection.
 
-        Args:
-            pop: Population to select survivors from.
-            n_survivors: Number of survivors to select for the next generation.
-            **kwargs: Optional keyword arguments. If 'fitness' is provided, it is used
-                directly. Otherwise, fitness is extracted from pop.objectives (which
-                must be single-objective).
+        Parameters
+        ----------
+        pop
+            Population to select from.
+        n_survivors
+            Number of survivors to select.
+        **kwargs
+            Optional ``fitness`` array. If omitted, fitness is extracted from a
+            single-objective population.
 
-        Returns:
-            Tuple of (indices, state) where:
-            - indices: Array of shape (n_survivors,) containing indices of selected
-              survivors from the input population, ordered by fitness (best first).
-            - state: Dictionary with key 'fitness' containing fitness values of
-              selected survivors. Shape (n_survivors,).
+        Returns
+        -------
+        tuple[numpy.ndarray, dict[str, numpy.ndarray]]
+            Selected indices and state containing the selected ``fitness`` values.
 
-        Raises:
-            ValueError: If population has no objectives and no fitness kwarg provided,
-                if n_survivors is invalid, if n_survivors exceeds population size,
-                or if population has multiple objectives without explicit fitness kwarg.
+        Raises
+        ------
+        ValueError
+            If inputs are invalid or no valid fitness source is available.
 
-        Example:
-            >>> x = np.array([[1, 2], [3, 4], [5, 6], [7, 8]])
-            >>> obj = np.array([[4.0], [2.0], [3.0], [1.0]])
-            >>> pop = Population(x=x, objectives=obj)
-            >>> selector = truncation_survival()
-            >>> indices, state = selector(pop, n_survivors=2)
-            >>> indices  # [3, 1] - individuals with fitness 1.0 and 2.0
-            >>> state['fitness']  # [1.0, 2.0]
+        Examples
+        --------
+        >>> import numpy as np
+        >>> from ctrl_freak.population import Population
+        >>> from ctrl_freak.survival.truncation import truncation_survival
+        >>> obj = np.array([[4.0], [2.0], [3.0], [1.0]])
+        >>> pop = Population(x=np.zeros((4, 1)), objectives=obj)
+        >>> indices, state = truncation_survival()(pop, n_survivors=2)
+        >>> indices
+        array([3, 1])
+        >>> state["fitness"]
+        array([1., 2.])
         """
         # Validate n_survivors
         if n_survivors <= 0:
             raise ValueError(f"n_survivors must be positive, got {n_survivors}")
         if n_survivors > len(pop):
-            raise ValueError(
-                f"n_survivors ({n_survivors}) cannot exceed population size ({len(pop)})"
-            )
+            raise ValueError(f"n_survivors ({n_survivors}) cannot exceed population size ({len(pop)})")
 
         # Get fitness values
         fitness = kwargs.get("fitness")
         if fitness is None:
             if pop.objectives is None:
-                raise ValueError(
-                    "Population must have objectives computed for survivor selection"
-                )
+                raise ValueError("Population must have objectives computed for survivor selection")
             if pop.objectives.shape[1] != 1:
                 raise ValueError(
                     f"truncation requires single-objective optimization "

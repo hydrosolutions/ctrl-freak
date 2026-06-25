@@ -1,78 +1,24 @@
-"""Refactored NSGA-II algorithm with pluggable selection and survival strategies.
+"""NSGA-II algorithm with pluggable strategies.
 
-This module provides the refactored nsga2() function that uses the registry system
-for flexible selection and survival strategy configuration. The function maintains
-a simple functional API while enabling strategy customization through either
-string-based registry lookups or direct callable injection.
-
-Key Features:
-- Pluggable parent selection (default: "crowded" tournament)
-- Pluggable survivor selection (default: "nsga2" non-dominated sorting)
-- Returns NSGA2Result with full algorithm state (rank, crowding distance)
-- Updated callback signature that receives NSGA2Result instead of Population
-- Thread-safe random number generation with optional seeding
-
-Example:
-    >>> from ctrl_freak.algorithms.nsga2 import nsga2
-    >>>
-    >>> def init(rng):
-    ...     return rng.uniform(0, 1, size=3)
-    >>>
-    >>> def evaluate(x):
-    ...     return np.array([x.sum(), (1 - x).sum()])
-    >>>
-    >>> def crossover(p1, p2):
-    ...     return (p1 + p2) / 2
-    >>>
-    >>> def mutate(x):
-    ...     return np.clip(x + 0.01 * rng.standard_normal(len(x)), 0, 1)
-    >>>
-    >>> # Using default strategies (string-based)
-    >>> result = nsga2(
-    ...     init=init,
-    ...     evaluate=evaluate,
-    ...     crossover=crossover,
-    ...     mutate=mutate,
-    ...     pop_size=100,
-    ...     n_generations=50,
-    ...     seed=42
-    ... )
-    >>>
-    >>> # Access Pareto front
-    >>> pareto_front = result.pareto_front
-    >>> print(f"Found {len(pareto_front)} solutions on Pareto front")
-    >>>
-    >>> # Using custom strategies (string-based)
-    >>> result = nsga2(
-    ...     init=init,
-    ...     evaluate=evaluate,
-    ...     crossover=crossover,
-    ...     mutate=mutate,
-    ...     pop_size=100,
-    ...     n_generations=50,
-    ...     select="crowded",
-    ...     survive="truncation",
-    ...     seed=42
-    ... )
-    >>>
-    >>> # Using callable strategies (advanced)
-    >>> from ctrl_freak.selection.crowded import crowded_tournament
-    >>> from ctrl_freak.survival.nsga2 import nsga2_survival
-    >>>
-    >>> custom_selector = crowded_tournament(tournament_size=3)
-    >>> custom_survivor = nsga2_survival()
-    >>>
-    >>> result = nsga2(
-    ...     init=init,
-    ...     evaluate=evaluate,
-    ...     crossover=crossover,
-    ...     mutate=mutate,
-    ...     pop_size=100,
-    ...     n_generations=50,
-    ...     select=custom_selector,
-    ...     survive=custom_survivor,
-    ...     seed=42
-    ... )
+Examples
+--------
+>>> import numpy as np
+>>> from ctrl_freak.algorithms.nsga2 import nsga2
+>>> def init(rng):
+...     return rng.uniform(0.0, 1.0, size=3)
+>>> def evaluate(x):
+...     return np.array([np.sum(x), np.sum(1.0 - x)])
+>>> result = nsga2(
+...     init=init,
+...     evaluate=evaluate,
+...     crossover=lambda p1, p2: (p1 + p2) / 2,
+...     mutate=lambda x: np.clip(x + 0.01, 0.0, 1.0),
+...     pop_size=10,
+...     n_generations=2,
+...     seed=42,
+... )
+>>> result.population.x.shape
+(10, 3)
 """
 
 from collections.abc import Callable
@@ -102,135 +48,66 @@ def nsga2(
     survive: str | SurvivorSelector = "nsga2",
     n_workers: int = 1,
 ) -> NSGA2Result:
-    """Run NSGA-II multi-objective optimization with pluggable strategies.
+    """Run NSGA-II multi-objective optimization.
 
-    This is the refactored NSGA-II implementation that uses the registry system
-    for flexible selection and survival strategy configuration. The function
-    maintains a simple functional API while enabling strategy customization.
+    Parameters
+    ----------
+    init
+        Callable that initializes one individual from a random generator.
+    evaluate
+        Callable that evaluates one individual and returns objective values.
+    crossover
+        Callable that crosses two parents to produce one child.
+    mutate
+        Callable that mutates one individual.
+    pop_size
+        Population size. Must be positive and even.
+    n_generations
+        Number of generations to run.
+    seed
+        Master random seed. If ``None``, system entropy is used.
+    callback
+        Optional callback called before each generation. Return ``True`` to stop.
+    select
+        Parent selection strategy name or callable.
+    survive
+        Survivor selection strategy name or callable.
+    n_workers
+        Number of workers for objective evaluation. Parallel evaluation is
+        deterministic only when ``evaluate`` is pure.
 
-    Args:
-        init: Initialize one individual.
-            Signature: (rng,) -> (n_vars,)
-        evaluate: Evaluate one individual.
-            Signature: (n_vars,) -> (n_obj,)
-        crossover: Cross two parents to produce one child.
-            Signature: (n_vars,), (n_vars,) -> (n_vars,)
-        mutate: Mutate one individual.
-            Signature: (n_vars,) -> (n_vars,)
-        pop_size: Population size N. Must be even for proper parent pairing.
-        n_generations: Number of generations to run.
-        seed: Random seed for reproducibility. If None, uses system entropy.
-        callback: Optional callback called at the start of each generation.
-            Signature: (result: NSGA2Result, generation: int) -> bool
-            If callback returns True, optimization stops early.
-            Note: This is a breaking change from the old callback signature
-            which received (Population, int).
-        select: Parent selection strategy. Can be:
-            - String: Name of registered strategy (e.g., "crowded", "roulette")
-            - ParentSelector: Direct callable following the ParentSelector protocol
-        survive: Survivor selection strategy. Can be:
-            - String: Name of registered strategy (e.g., "nsga2", "truncation", "elitist")
-            - SurvivorSelector: Direct callable following the SurvivorSelector protocol
-        n_workers: Number of parallel workers for evaluation. Use 1 for sequential
-            execution (default), -1 for all CPU cores, or any positive integer.
-            Note: evaluate function must be picklable for parallel execution.
+    Returns
+    -------
+    NSGA2Result
+        Final population, ranks, crowding distances, generation count, and
+        evaluation count.
 
-    Returns:
-        NSGA2Result containing:
-        - population: Final population with x and objectives
-        - rank: Pareto ranks for each individual (0 = Pareto front)
-        - crowding_distance: Crowding distances for diversity
-        - generations: Number of generations completed
-        - evaluations: Total number of function evaluations
+    Raises
+    ------
+    ValueError
+        If size, generation, or worker arguments are invalid.
+    KeyError
+        If a named strategy is not registered.
 
-    Raises:
-        ValueError: If pop_size is not positive, if pop_size is odd (required for
-            parent pairing), if n_generations is negative, or if n_workers is
-            invalid (must be positive or -1).
-        KeyError: If string strategy names are not found in registries.
-
-    Algorithm Flow:
-        1. Resolve selection and survival strategies from registry or use callables
-        2. Initialize population and evaluate
-        3. Apply survival strategy to get initial rank and crowding distance
-        4. For each generation:
-           a. Call callback with current NSGA2Result (early stopping if returns True)
-           b. Select parents using parent_selector with current state
-           c. Create offspring via crossover and mutation
-           d. Evaluate offspring population
-           e. Combine parents + offspring
-           f. Apply survival selection to get survivors and updated state
-           g. Update population and state for next generation
-        5. Return final NSGA2Result with full state
-
-    Example with string-based strategies:
-        >>> def init(rng):
-        ...     return rng.uniform(0, 1, size=3)
-        >>>
-        >>> def evaluate(x):
-        ...     return np.array([x.sum(), (1 - x).sum()])
-        >>>
-        >>> def crossover(p1, p2):
-        ...     return (p1 + p2) / 2
-        >>>
-        >>> def mutate(x):
-        ...     return np.clip(x + 0.01, 0, 1)
-        >>>
-        >>> result = nsga2(
-        ...     init=init,
-        ...     evaluate=evaluate,
-        ...     crossover=crossover,
-        ...     mutate=mutate,
-        ...     pop_size=100,
-        ...     n_generations=50,
-        ...     seed=42,
-        ...     select="crowded",
-        ...     survive="nsga2"
-        ... )
-        >>>
-        >>> # Extract Pareto front
-        >>> front = result.pareto_front
-        >>> print(f"Pareto front has {len(front)} solutions")
-
-    Example with callable strategies:
-        >>> from ctrl_freak.selection.crowded import crowded_tournament
-        >>> from ctrl_freak.survival.nsga2 import nsga2_survival
-        >>>
-        >>> # Create custom configured strategies
-        >>> my_selector = crowded_tournament(tournament_size=3)
-        >>> my_survivor = nsga2_survival()
-        >>>
-        >>> result = nsga2(
-        ...     init=init,
-        ...     evaluate=evaluate,
-        ...     crossover=crossover,
-        ...     mutate=mutate,
-        ...     pop_size=100,
-        ...     n_generations=50,
-        ...     select=my_selector,
-        ...     survive=my_survivor,
-        ...     seed=42
-        ... )
-
-    Example with callback for early stopping:
-        >>> def early_stop(result: NSGA2Result, gen: int) -> bool:
-        ...     # Stop if we have 10 solutions on Pareto front
-        ...     pareto_count = np.sum(result.rank == 0)
-        ...     if pareto_count >= 10:
-        ...         print(f"Early stopping at generation {gen}")
-        ...         return True
-        ...     return False
-        >>>
-        >>> result = nsga2(
-        ...     init=init,
-        ...     evaluate=evaluate,
-        ...     crossover=crossover,
-        ...     mutate=mutate,
-        ...     pop_size=100,
-        ...     n_generations=1000,
-        ...     callback=early_stop,
-        ...     seed=42
-        ... )
+    Examples
+    --------
+    >>> import numpy as np
+    >>> from ctrl_freak.algorithms.nsga2 import nsga2
+    >>> def init(rng):
+    ...     return rng.uniform(0.0, 1.0, size=2)
+    >>> def evaluate(x):
+    ...     return np.array([np.sum(x), np.sum(1.0 - x)])
+    >>> result = nsga2(
+    ...     init=init,
+    ...     evaluate=evaluate,
+    ...     crossover=lambda p1, p2: (p1 + p2) / 2,
+    ...     mutate=lambda x: x.copy(),
+    ...     pop_size=10,
+    ...     n_generations=2,
+    ...     seed=1,
+    ... )
+    >>> result.generations
+    2
     """
     # Validate inputs
     if pop_size <= 0:
@@ -250,8 +127,18 @@ def nsga2(
     # Create evaluator (parallel or sequential)
     lifted_evaluate = lift_parallel(evaluate, n_workers) if n_workers != 1 else lift(evaluate)
 
-    # Initialize random number generator
-    rng = np.random.default_rng(seed)
+    # Derive independent per-phase RNG streams from the single master seed so one seed
+    # reproduces init + parent selection + crossover + mutation bit-identically.
+    # Child order is the reproducibility contract: [init, select, crossover, mutate]. Never reorder.
+    init_ss, select_ss, crossover_ss, mutate_ss = np.random.SeedSequence(seed).spawn(4)
+    rng = np.random.default_rng(init_ss)
+    select_rng = np.random.default_rng(select_ss)
+    set_crossover_rng = getattr(crossover, "set_rng", None)
+    if callable(set_crossover_rng):
+        set_crossover_rng(np.random.default_rng(crossover_ss))
+    set_mutate_rng = getattr(mutate, "set_rng", None)
+    if callable(set_mutate_rng):
+        set_mutate_rng(np.random.default_rng(mutate_ss))
 
     # Initialize population
     init_x = np.stack([init(rng) for _ in range(pop_size)])
@@ -260,7 +147,6 @@ def nsga2(
 
     # Compute initial state via survival strategy
     # This gives us initial rank and crowding distance
-    np.arange(pop_size)
     _, state = survivor_selector(pop, pop_size)
 
     # Track evaluations: initial population
@@ -283,7 +169,7 @@ def nsga2(
             break
 
         # Select parents using current state
-        parent_indices = parent_selector(pop, pop_size, rng, **state)
+        parent_indices = parent_selector(pop, pop_size, select_rng, **state)
 
         # Create offspring via crossover and mutation
         offspring_x = np.empty_like(pop.x)
@@ -309,6 +195,7 @@ def nsga2(
         survivor_indices, state = survivor_selector(combined, pop_size)
 
         # Update population
+        assert combined.objectives is not None  # Guaranteed by Population construction above
         pop = Population(
             x=combined.x[survivor_indices],
             objectives=combined.objectives[survivor_indices],

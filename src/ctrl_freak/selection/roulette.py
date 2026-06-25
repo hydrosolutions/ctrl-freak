@@ -18,15 +18,21 @@ def roulette_wheel():
 
     where ε is a small constant to ensure the worst individual has non-zero probability.
 
-    Returns:
-        A ParentSelector callable that performs fitness-proportionate selection.
+    Returns
+    -------
+    callable
+        Parent selector that performs fitness-proportionate selection.
 
-    Example:
-        >>> selector = roulette_wheel()
-        >>> # Use with explicit fitness
-        >>> parents = selector(pop, n_parents=20, rng=rng, fitness=fitness_array)
-        >>> # Or with single-objective population (extracts from objectives)
-        >>> parents = selector(pop, n_parents=20, rng=rng)
+    Examples
+    --------
+    >>> import numpy as np
+    >>> from ctrl_freak.population import Population
+    >>> from ctrl_freak.selection.roulette import roulette_wheel
+    >>> pop = Population(x=np.zeros((4, 2)), objectives=np.array([[4.0], [1.0], [2.0], [3.0]]))
+    >>> selector = roulette_wheel()
+    >>> parents = selector(pop, 5, np.random.default_rng(0))
+    >>> parents.shape
+    (5,)
     """
 
     def selector(
@@ -37,19 +43,39 @@ def roulette_wheel():
     ) -> np.ndarray:
         """Select parents using fitness-proportionate (roulette wheel) selection.
 
-        Args:
-            pop: Population to select from.
-            n_parents: Number of parents to select.
-            rng: Random number generator for reproducibility.
-            **kwargs: May include 'fitness' array (1D). If not provided, extracts from
-                pop.objectives if it has exactly one column.
+        Parameters
+        ----------
+        pop
+            Population to select from.
+        n_parents
+            Number of parents to select.
+        rng
+            Random number generator.
+        **kwargs
+            Optional ``fitness`` array. If omitted, fitness is extracted from a
+            single-objective population.
 
-        Returns:
-            Array of selected parent indices with shape (n_parents,) and dtype np.intp.
+        Returns
+        -------
+        numpy.ndarray
+            Selected parent indices with shape ``(n_parents,)`` and dtype
+            ``np.intp``.
 
-        Raises:
-            ValueError: If no fitness source is available (no 'fitness' kwarg and
-                either objectives is None or has multiple columns).
+        Raises
+        ------
+        ValueError
+            If no valid fitness source is available.
+
+        Examples
+        --------
+        >>> import numpy as np
+        >>> from ctrl_freak.population import Population
+        >>> from ctrl_freak.selection.roulette import roulette_wheel
+        >>> pop = Population(x=np.zeros((3, 1)), objectives=np.array([[3.0], [1.0], [2.0]]))
+        >>> selector = roulette_wheel()
+        >>> out = selector(pop, 4, np.random.default_rng(2))
+        >>> out.shape
+        (4,)
         """
         # Get fitness array
         if "fitness" in kwargs:

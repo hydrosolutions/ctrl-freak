@@ -51,13 +51,15 @@ class TestNSGA2Survival:
         # Front 1: individuals 2, 3 (both dominated)
         # To ensure 2,3 are dominated, they must be worse in all objectives or worse in some
         x = np.array([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0], [7.0, 8.0], [9.0, 10.0]])
-        objectives = np.array([
-            [1.0, 5.0],  # Front 0 - non-dominated
-            [5.0, 1.0],  # Front 0 - non-dominated (trades off with individual 0)
-            [2.0, 4.0],  # Front 1 - dominated by individual 0 (1.0 < 2.0, 5.0 > 4.0 but not strict domination)
-            [4.0, 2.0],  # Front 1 - dominated by individual 1 (5.0 > 4.0, 1.0 < 2.0 but not strict domination)
-            [3.0, 3.0],  # Front 2 - dominated by both individuals from front 1
-        ])
+        objectives = np.array(
+            [
+                [1.0, 5.0],  # Front 0 - non-dominated
+                [5.0, 1.0],  # Front 0 - non-dominated (trades off with individual 0)
+                [2.0, 4.0],  # Front 1 - dominated by individual 0 (1.0 < 2.0, 5.0 > 4.0 but not strict domination)
+                [4.0, 2.0],  # Front 1 - dominated by individual 1 (5.0 > 4.0, 1.0 < 2.0 but not strict domination)
+                [3.0, 3.0],  # Front 2 - dominated by both individuals from front 1
+            ]
+        )
         pop = Population(x=x, objectives=objectives)
 
         selector = nsga2_survival()
@@ -83,12 +85,14 @@ class TestNSGA2Survival:
         # We'll select 2 survivors, so all come from front 0
         # Individuals with higher crowding distance should be preferred
         x = np.array([[1.0], [2.0], [3.0], [4.0]])
-        objectives = np.array([
-            [1.0, 4.0],  # Boundary point (min f1, max f2)
-            [2.0, 3.0],  # Interior point
-            [3.0, 2.0],  # Interior point
-            [4.0, 1.0],  # Boundary point (max f1, min f2)
-        ])
+        objectives = np.array(
+            [
+                [1.0, 4.0],  # Boundary point (min f1, max f2)
+                [2.0, 3.0],  # Interior point
+                [3.0, 2.0],  # Interior point
+                [4.0, 1.0],  # Boundary point (max f1, min f2)
+            ]
+        )
         pop = Population(x=x, objectives=objectives)
 
         selector = nsga2_survival()
@@ -110,12 +114,14 @@ class TestNSGA2Survival:
         """Test that boundary points receive infinite crowding distance."""
         # Create a simple front with clear boundaries
         x = np.array([[1.0], [2.0], [3.0], [4.0]])
-        objectives = np.array([
-            [1.0, 4.0],  # Boundary: min f1, max f2
-            [2.0, 3.0],  # Interior
-            [3.0, 2.0],  # Interior
-            [4.0, 1.0],  # Boundary: max f1, min f2
-        ])
+        objectives = np.array(
+            [
+                [1.0, 4.0],  # Boundary: min f1, max f2
+                [2.0, 3.0],  # Interior
+                [3.0, 2.0],  # Interior
+                [4.0, 1.0],  # Boundary: max f1, min f2
+            ]
+        )
         pop = Population(x=x, objectives=objectives)
 
         selector = nsga2_survival()
@@ -219,14 +225,16 @@ class TestNSGA2Survival:
         # Create population with clear hierarchical domination
         # Use a simple pattern where higher values = worse in both objectives
         x = np.arange(6).reshape(6, 1)
-        objectives = np.array([
-            [1.0, 1.0],   # Front 0 - best in both
-            [2.0, 2.0],   # Front 1 - dominated by front 0
-            [3.0, 3.0],   # Front 2 - dominated by front 1
-            [4.0, 4.0],   # Front 3 - dominated by front 2
-            [5.0, 5.0],   # Front 4 - dominated by front 3
-            [6.0, 6.0],   # Front 5 - dominated by front 4
-        ])
+        objectives = np.array(
+            [
+                [1.0, 1.0],  # Front 0 - best in both
+                [2.0, 2.0],  # Front 1 - dominated by front 0
+                [3.0, 3.0],  # Front 2 - dominated by front 1
+                [4.0, 4.0],  # Front 3 - dominated by front 2
+                [5.0, 5.0],  # Front 4 - dominated by front 3
+                [6.0, 6.0],  # Front 5 - dominated by front 4
+            ]
+        )
         pop = Population(x=x, objectives=objectives)
 
         selector = nsga2_survival()
@@ -249,14 +257,16 @@ class TestNSGA2Survival:
         """Test that crowding distances are computed correctly within each front."""
         # Create a simple population where we know the expected crowding distances
         x = np.arange(6).reshape(6, 1)
-        objectives = np.array([
-            [1.0, 5.0],  # Front 0 - boundary (min f1)
-            [3.0, 3.0],  # Front 0 - interior
-            [5.0, 1.0],  # Front 0 - boundary (max f1)
-            [2.0, 4.0],  # Front 1 - boundary (min f1)
-            [4.0, 2.0],  # Front 1 - boundary (max f1)
-            [3.0, 3.0],  # Front 1 - should be dominated, actually this is same as index 1
-        ])
+        objectives = np.array(
+            [
+                [1.0, 5.0],  # Front 0 - boundary (min f1)
+                [3.0, 3.0],  # Front 0 - interior
+                [5.0, 1.0],  # Front 0 - boundary (max f1)
+                [2.0, 4.0],  # Front 1 - boundary (min f1)
+                [4.0, 2.0],  # Front 1 - boundary (max f1)
+                [3.0, 3.0],  # Front 1 - should be dominated, actually this is same as index 1
+            ]
+        )
         # Adjust to ensure clear fronts
         objectives[5] = [2.5, 3.5]  # Make it actually in front 1
 
@@ -970,9 +980,7 @@ class TestElitistSurvival:
         x = np.arange(10).reshape(10, 1).astype(float)
         # Parents: [5.0, 3.0, 4.0]
         # Offspring: [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7]
-        objectives = np.array(
-            [[5.0], [3.0], [4.0], [0.1], [0.2], [0.3], [0.4], [0.5], [0.6], [0.7]]
-        )
+        objectives = np.array([[5.0], [3.0], [4.0], [0.1], [0.2], [0.3], [0.4], [0.5], [0.6], [0.7]])
         pop = Population(x=x, objectives=objectives)
 
         selector = elitist_survival(elite_count=1)
