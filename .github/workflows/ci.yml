@@ -1,0 +1,77 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: test (py${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: "0.9.0"
+          python-version: ${{ matrix.python-version }}
+          enable-cache: true
+
+      - name: Sync dependencies
+        run: uv sync --locked --all-extras --dev
+
+      - name: Lint (ruff check)
+        run: uv run ruff check
+
+      - name: Format check (ruff format)
+        run: uv run ruff format --check
+
+      - name: Type check (ty)
+        run: uv run ty check src/
+
+      - name: Tests with coverage gate
+        run: uv run pytest
+
+      - name: Doctests
+        run: uv run pytest --doctest-modules src/ctrl_freak --no-cov
+
+  numpy-floor:
+    name: numpy floor (numpy 2.0)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: "0.9.0"
+          python-version: "3.11"
+          enable-cache: true
+
+      - name: Sync dependencies
+        run: uv sync --locked --all-extras --dev
+
+      - name: Pin numpy to the >=2.0 floor
+        run: uv pip install "numpy==2.0.*"
+
+      - name: Verify numpy floor is installed
+        run: uv run --no-sync python -c "import numpy; print(numpy.__version__); assert numpy.__version__.startswith('2.0.'), numpy.__version__"
+
+      - name: Tests against numpy floor
+        run: uv run --no-sync pytest
