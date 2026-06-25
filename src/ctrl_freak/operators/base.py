@@ -1,7 +1,4 @@
-"""Base genetic operators.
-
-This module provides the core lift decorator for genetic operators.
-"""
+"""Base genetic-operator adapters."""
 
 from collections.abc import Callable
 
@@ -14,22 +11,27 @@ def lift(fn: Callable[[np.ndarray], np.ndarray]) -> Callable[[np.ndarray], np.nd
     This utility allows users to write simple per-individual functions
     while the framework handles batching/vectorization.
 
-    Args:
-        fn: Function that operates on a single individual.
-            Signature: (n_vars,) -> (n_out,)
+    Parameters
+    ----------
+    fn : collections.abc.Callable
+        Function that operates on one individual with signature
+        ``(n_vars,) -> (n_out,)``.
 
-    Returns:
-        A function that operates on a population.
-        Signature: (n, n_vars) -> (n, n_out)
+    Returns
+    -------
+    collections.abc.Callable
+        Function that operates on a population with signature
+        ``(n, n_vars) -> (n, n_out)``.
 
-    Example:
-        >>> def evaluate_one(x: np.ndarray) -> np.ndarray:
-        ...     return np.array([x.sum(), x.prod()])
-        >>> evaluate = lift(evaluate_one)
-        >>> pop_x = np.array([[1.0, 2.0], [3.0, 4.0]])
-        >>> evaluate(pop_x)
-        array([[ 3.,  2.],
-               [ 7., 12.]])
+    Examples
+    --------
+    >>> def evaluate_one(x: np.ndarray) -> np.ndarray:
+    ...     return np.array([x.sum(), x.prod()])
+    >>> evaluate = lift(evaluate_one)
+    >>> pop_x = np.array([[1.0, 2.0], [3.0, 4.0]])
+    >>> evaluate(pop_x)
+    array([[ 3.,  2.],
+           [ 7., 12.]])
     """
 
     def lifted(x: np.ndarray) -> np.ndarray:
@@ -38,32 +40,35 @@ def lift(fn: Callable[[np.ndarray], np.ndarray]) -> Callable[[np.ndarray], np.nd
     return lifted
 
 
-def lift_parallel(
-    fn: Callable[[np.ndarray], np.ndarray], n_workers: int
-) -> Callable[[np.ndarray], np.ndarray]:
+def lift_parallel(fn: Callable[[np.ndarray], np.ndarray], n_workers: int) -> Callable[[np.ndarray], np.ndarray]:
     """Lift a per-individual function to work on a population with parallel execution.
 
     This utility allows users to write simple per-individual functions
     while the framework handles batching/vectorization with parallel workers.
 
-    Args:
-        fn: Function that operates on a single individual.
-            Signature: (n_vars,) -> (n_out,)
-            Must be picklable for multiprocessing.
-        n_workers: Number of parallel workers. Use -1 for all CPU cores.
+    Parameters
+    ----------
+    fn : collections.abc.Callable
+        Function that operates on one individual with signature
+        ``(n_vars,) -> (n_out,)``. It must be picklable for multiprocessing.
+    n_workers : int
+        Number of parallel workers. Use ``-1`` for all CPU cores.
 
-    Returns:
-        A function that operates on a population in parallel.
-        Signature: (n, n_vars) -> (n, n_out)
+    Returns
+    -------
+    collections.abc.Callable
+        Function that operates on a population in parallel with signature
+        ``(n, n_vars) -> (n, n_out)``.
 
-    Example:
-        >>> def evaluate_one(x: np.ndarray) -> np.ndarray:
-        ...     return np.array([x.sum(), x.prod()])
-        >>> evaluate = lift_parallel(evaluate_one, n_workers=4)
-        >>> pop_x = np.array([[1.0, 2.0], [3.0, 4.0]])
-        >>> evaluate(pop_x)
-        array([[ 3.,  2.],
-               [ 7., 12.]])
+    Examples
+    --------
+    >>> def evaluate_one(x: np.ndarray) -> np.ndarray:
+    ...     return np.array([x.sum(), x.prod()])
+    >>> evaluate = lift_parallel(evaluate_one, n_workers=4)
+    >>> pop_x = np.array([[1.0, 2.0], [3.0, 4.0]])
+    >>> evaluate(pop_x)
+    array([[ 3.,  2.],
+           [ 7., 12.]])
     """
     from joblib import Parallel, delayed
 

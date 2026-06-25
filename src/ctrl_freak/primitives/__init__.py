@@ -1,6 +1,11 @@
-"""NSGA-II primitives for Pareto-based ranking and diversity.
+"""Pareto-based ranking and diversity primitives.
 
-This package provides core pure functions for multi-objective optimization.
+Examples
+--------
+>>> import numpy as np
+>>> ranks = non_dominated_sort(np.array([[1.0, 1.0], [2.0, 2.0]]))
+>>> ranks
+array([0, 1])
 """
 
 from ctrl_freak.primitives.pareto import (
