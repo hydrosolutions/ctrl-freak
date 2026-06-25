@@ -374,9 +374,13 @@ assert np.allclose(result1.population.objectives, result2.population.objectives)
 ```
 
 The seed controls:
-- Initial population generation (via `init`)
+- Initial population generation via `init`
 - Parent selection
-- Any randomness in crossover/mutate if they use the provided RNG
+- Crossover
+- Mutation
+
+Operator generators are derived from the master seed with `numpy.random.SeedSequence.spawn`,
+so one `seed=` value reproduces the whole run.
 
 ### Parallel Evaluation
 
@@ -415,7 +419,7 @@ result = nsga2(..., n_workers=-1)
 
 - The `evaluate` function must be **picklable** (no closures over unpicklable objects)
 - Memory usage scales with `n_workers` (each worker gets a copy of data)
-- Results are deterministic regardless of `n_workers` (same seed = same results)
+- Results are deterministic regardless of `n_workers` when `evaluate` is pure (same seed = same results)
 
 ---
 
@@ -594,7 +598,7 @@ ctrl-freak provides well-established genetic operators commonly used in evolutio
 
 ### SBX Crossover (Simulated Binary Crossover)
 
-SBX simulates single-point crossover behavior for real-valued variables. It produces children whose distribution around the parent values is controlled by the distribution index `eta`.
+SBX simulates single-point crossover behavior for real-valued variables. It produces children whose distribution around the parent values is controlled by the distribution index `eta`, and respects bounds through the bounded SBX formulation itself.
 
 ```python
 from ctrl_freak import sbx_crossover
@@ -830,154 +834,3 @@ def my_survival(pop, n_survivors, **kwargs):
 
 result = ga(..., survive=my_survival)
 ```
-## Migration from Previous API
-
-### Breaking Changes in v2.0
-
-The v2.0 release introduced a new extensible framework with several breaking changes to support single-objective GA and customizable selection strategies.
-
-#### 1. Population no longer has rank/crowding_distance fields
-
-**Old API:**
-```python
-pop = nsga2(...)
-pareto_mask = pop.rank == 0
-pareto_cd = pop.crowding_distance[pareto_mask]
-```
-
-**New API:**
-```python
-result = nsga2(...)
-pareto_mask = result.rank == 0
-pareto_cd = result.crowding_distance[pareto_mask]
-```
-
-#### 2. nsga2() returns NSGA2Result, not Population
-
-**Old API:**
-```python
-pop = nsga2(...)
-all_x = pop.x
-```
-
-**New API:**
-```python
-result = nsga2(...)
-all_x = result.population.x
-```
-
-#### 3. Callback signature changed
-
-**Old API:**
-```python
-def callback(pop: Population, gen: int) -> bool:
-    n_pareto = np.sum(pop.rank == 0)
-    return False
-
-final_pop = nsga2(..., callback=callback)
-```
-
-**New API:**
-```python
-def callback(result: NSGA2Result, gen: int) -> bool:
-    n_pareto = len(result.pareto_front.x)
-    return False
-
-result = nsga2(..., callback=callback)
-```
-
-#### 4. Pareto front extraction
-
-**Old API:**
-```python
-pop = nsga2(...)
-pareto_mask = pop.rank == 0
-pareto_x = pop.x[pareto_mask]
-pareto_obj = pop.objectives[pareto_mask]
-```
-
-**New API:**
-```python
-result = nsga2(...)
-pareto_front = result.pareto_front
-pareto_x = pareto_front.x
-pareto_obj = pareto_front.objectives
-```
-
-#### 5. IndividualView no longer has rank/crowding_distance
-
-**Old API:**
-```python
-ind = pop[0]
-rank = ind.rank
-cd = ind.crowding_distance
-```
-
-**New API:**
-```python
-ind = result.population[0]
-rank = result.rank[0]
-cd = result.crowding_distance[0]
-```
-
-### Complete Migration Example
-
-**Old code:**
-```python
-from ctrl_freak import nsga2, Population
-
-def callback(pop: Population, gen: int) -> bool:
-    pareto_mask = pop.rank == 0
-    n_pareto = np.sum(pareto_mask)
-    print(f"Gen {gen}: {n_pareto} solutions")
-    return False
-
-pop = nsga2(
-    init=init,
-    evaluate=evaluate,
-    crossover=crossover,
-    mutate=mutate,
-    pop_size=100,
-    n_generations=200,
-    callback=callback,
-)
-
-pareto_mask = pop.rank == 0
-pareto_x = pop.x[pareto_mask]
-pareto_obj = pop.objectives[pareto_mask]
-best_f0 = pareto_obj[:, 0].min()
-```
-
-**New code:**
-```python
-from ctrl_freak import nsga2, NSGA2Result
-
-def callback(result: NSGA2Result, gen: int) -> bool:
-    n_pareto = len(result.pareto_front.x)
-    print(f"Gen {gen}: {n_pareto} solutions")
-    return False
-
-result = nsga2(
-    init=init,
-    evaluate=evaluate,
-    crossover=crossover,
-    mutate=mutate,
-    pop_size=100,
-    n_generations=200,
-    callback=callback,
-)
-
-pareto_front = result.pareto_front
-pareto_x = pareto_front.x
-pareto_obj = pareto_front.objectives
-best_f0 = pareto_obj[:, 0].min()
-```
-
-### New Features in v2.0
-
-1. **Single-objective GA**: Use `ga()` for standard genetic algorithms
-2. **Customizable selection**: Pass `select` parameter to choose parent selection strategy
-3. **Customizable survival**: Pass `survive` parameter to choose survival selection strategy
-4. **Result types**: Clear separation between population data and algorithm metadata
-
----

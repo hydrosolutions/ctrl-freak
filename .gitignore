@@ -17,3 +17,6 @@ wheels/
 
 tasks/
 archive/
+
+# Docs build
+/site/
