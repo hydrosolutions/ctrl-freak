@@ -1,88 +1,34 @@
-"""Standard genetic algorithm with pluggable selection and survival strategies.
+"""Standard genetic algorithm with pluggable strategies.
 
-This module provides the standard single-objective genetic algorithm (GA) that uses
-the registry system for flexible selection and survival strategy configuration. The
-function maintains a simple functional API while enabling strategy customization
-through either string-based registry lookups or direct callable injection.
-
-Key Features:
-- Pluggable parent selection (default: "tournament")
-- Pluggable survivor selection (default: "elitist")
-- Returns GAResult with fitness values and best individual
-- Callback signature receives GAResult instead of Population
-- Thread-safe random number generation with optional seeding
-
-Example:
-    >>> from ctrl_freak.algorithms.ga import ga
-    >>>
-    >>> def init(rng):
-    ...     return rng.uniform(0, 1, size=3)
-    >>>
-    >>> def evaluate(x):
-    ...     return x.sum()  # Returns scalar for single-objective
-    >>>
-    >>> def crossover(p1, p2):
-    ...     return (p1 + p2) / 2
-    >>>
-    >>> def mutate(x):
-    ...     return np.clip(x + 0.01 * rng.standard_normal(len(x)), 0, 1)
-    >>>
-    >>> # Using default strategies (string-based)
-    >>> result = ga(
-    ...     init=init,
-    ...     evaluate=evaluate,
-    ...     crossover=crossover,
-    ...     mutate=mutate,
-    ...     pop_size=100,
-    ...     n_generations=50,
-    ...     seed=42
-    ... )
-    >>>
-    >>> # Access best solution
-    >>> best_x, best_fitness = result.best
-    >>> print(f"Best solution: {best_x} with fitness {best_fitness}")
-    >>>
-    >>> # Using custom strategies (string-based)
-    >>> result = ga(
-    ...     init=init,
-    ...     evaluate=evaluate,
-    ...     crossover=crossover,
-    ...     mutate=mutate,
-    ...     pop_size=100,
-    ...     n_generations=50,
-    ...     select="tournament",
-    ...     survive="elitist",
-    ...     seed=42
-    ... )
-    >>>
-    >>> # Using callable strategies (advanced)
-    >>> from ctrl_freak.selection.tournament import fitness_tournament
-    >>> from ctrl_freak.survival.elitist import elitist_survival
-    >>>
-    >>> custom_selector = fitness_tournament(tournament_size=3)
-    >>> custom_survivor = elitist_survival(elite_count=2)
-    >>>
-    >>> result = ga(
-    ...     init=init,
-    ...     evaluate=evaluate,
-    ...     crossover=crossover,
-    ...     mutate=mutate,
-    ...     pop_size=100,
-    ...     n_generations=50,
-    ...     select=custom_selector,
-    ...     survive=custom_survivor,
-    ...     seed=42
-    ... )
+Examples
+--------
+>>> import numpy as np
+>>> from ctrl_freak.algorithms.ga import ga
+>>> def init(rng):
+...     return rng.uniform(0.0, 1.0, size=3)
+>>> def evaluate(x):
+...     return float(np.sum(x**2))
+>>> result = ga(
+...     init=init,
+...     evaluate=evaluate,
+...     crossover=lambda p1, p2: (p1 + p2) / 2,
+...     mutate=lambda x: np.clip(x + 0.01, 0.0, 1.0),
+...     pop_size=10,
+...     n_generations=2,
+...     seed=42,
+... )
+>>> result.population.x.shape
+(10, 3)
 """
 
 from collections.abc import Callable
 
 import numpy as np
-from joblib import Parallel, delayed
 
 # Import selection and survival modules to trigger strategy registration
 import ctrl_freak.selection  # noqa: F401
 import ctrl_freak.survival  # noqa: F401
+from ctrl_freak.operators import lift, lift_parallel
 from ctrl_freak.population import Population
 from ctrl_freak.protocols import ParentSelector, SurvivorSelector
 from ctrl_freak.registry import SelectionRegistry, SurvivalRegistry
@@ -102,134 +48,67 @@ def ga(
     survive: str | SurvivorSelector = "elitist",
     n_workers: int = 1,
 ) -> GAResult:
-    """Run standard single-objective genetic algorithm with pluggable strategies.
+    """Run a single-objective genetic algorithm.
 
-    This is the standard GA implementation that uses the registry system for
-    flexible selection and survival strategy configuration. The function maintains
-    a simple functional API while enabling strategy customization.
+    Parameters
+    ----------
+    init
+        Callable that initializes one individual from a random generator.
+    evaluate
+        Callable that evaluates one individual and returns a scalar objective.
+        Lower objective values are better.
+    crossover
+        Callable that crosses two parents to produce one child.
+    mutate
+        Callable that mutates one individual.
+    pop_size
+        Population size. Must be positive and even.
+    n_generations
+        Number of generations to run.
+    seed
+        Master random seed. If ``None``, system entropy is used.
+    callback
+        Optional callback called before each generation. Return ``True`` to stop.
+    select
+        Parent selection strategy name or callable.
+    survive
+        Survivor selection strategy name or callable.
+    n_workers
+        Number of workers for objective evaluation. Parallel evaluation is
+        deterministic only when ``evaluate`` is pure.
 
-    Args:
-        init: Initialize one individual.
-            Signature: (rng,) -> (n_vars,)
-        evaluate: Evaluate one individual, returning scalar fitness value.
-            Signature: (n_vars,) -> float
-            Note: For minimization problems, lower values are better.
-        crossover: Cross two parents to produce one child.
-            Signature: (n_vars,), (n_vars,) -> (n_vars,)
-        mutate: Mutate one individual.
-            Signature: (n_vars,) -> (n_vars,)
-        pop_size: Population size N. Must be even for proper parent pairing.
-        n_generations: Number of generations to run.
-        seed: Random seed for reproducibility. If None, uses system entropy.
-        callback: Optional callback called at the start of each generation.
-            Signature: (result: GAResult, generation: int) -> bool
-            If callback returns True, optimization stops early.
-        select: Parent selection strategy. Can be:
-            - String: Name of registered strategy (e.g., "tournament", "roulette")
-            - ParentSelector: Direct callable following the ParentSelector protocol
-        survive: Survivor selection strategy. Can be:
-            - String: Name of registered strategy (e.g., "elitist", "truncation")
-            - SurvivorSelector: Direct callable following the SurvivorSelector protocol
-        n_workers: Number of parallel workers for evaluation. Use 1 for sequential
-            execution (default), -1 for all CPU cores, or any positive integer.
-            Note: evaluate function must be picklable for parallel execution.
+    Returns
+    -------
+    GAResult
+        Final population, fitness vector, best index, generation count, and
+        evaluation count.
 
-    Returns:
-        GAResult containing:
-        - population: Final population with x and objectives
-        - fitness: Fitness values for each individual (same as objectives[:, 0])
-        - best_idx: Index of the best individual (lowest fitness)
-        - generations: Number of generations completed
-        - evaluations: Total number of function evaluations
+    Raises
+    ------
+    ValueError
+        If size, generation, or worker arguments are invalid.
+    KeyError
+        If a named strategy is not registered.
 
-    Raises:
-        ValueError: If pop_size is not positive, if pop_size is odd (required for
-            parent pairing), if n_generations is negative, or if n_workers is
-            invalid (must be positive or -1).
-        KeyError: If string strategy names are not found in registries.
-
-    Algorithm Flow:
-        1. Resolve selection and survival strategies from registry or use callables
-        2. Initialize population and evaluate
-        3. Apply survival strategy to get initial fitness state
-        4. For each generation:
-           a. Call callback with current GAResult (early stopping if returns True)
-           b. Select parents using parent_selector with current state
-           c. Create offspring via crossover and mutation
-           d. Evaluate offspring population
-           e. Combine parents + offspring
-           f. Apply survival selection to get survivors and updated state
-           g. Update population and state for next generation
-        5. Return final GAResult with best individual
-
-    Example with string-based strategies:
-        >>> def init(rng):
-        ...     return rng.uniform(0, 1, size=3)
-        >>>
-        >>> def evaluate(x):
-        ...     return x.sum()  # Scalar fitness
-        >>>
-        >>> def crossover(p1, p2):
-        ...     return (p1 + p2) / 2
-        >>>
-        >>> def mutate(x):
-        ...     return np.clip(x + 0.01, 0, 1)
-        >>>
-        >>> result = ga(
-        ...     init=init,
-        ...     evaluate=evaluate,
-        ...     crossover=crossover,
-        ...     mutate=mutate,
-        ...     pop_size=100,
-        ...     n_generations=50,
-        ...     seed=42,
-        ...     select="tournament",
-        ...     survive="elitist"
-        ... )
-        >>>
-        >>> # Extract best solution
-        >>> best_x, best_fitness = result.best
-        >>> print(f"Best: {best_x} with fitness {best_fitness}")
-
-    Example with callable strategies:
-        >>> from ctrl_freak.selection.tournament import fitness_tournament
-        >>> from ctrl_freak.survival.elitist import elitist_survival
-        >>>
-        >>> # Create custom configured strategies
-        >>> my_selector = fitness_tournament(tournament_size=5)
-        >>> my_survivor = elitist_survival(elite_count=2)
-        >>>
-        >>> result = ga(
-        ...     init=init,
-        ...     evaluate=evaluate,
-        ...     crossover=crossover,
-        ...     mutate=mutate,
-        ...     pop_size=100,
-        ...     n_generations=50,
-        ...     select=my_selector,
-        ...     survive=my_survivor,
-        ...     seed=42
-        ... )
-
-    Example with callback for early stopping:
-        >>> def early_stop(result: GAResult, gen: int) -> bool:
-        ...     # Stop if best fitness is below threshold
-        ...     _, best_fitness = result.best
-        ...     if best_fitness < 1e-6:
-        ...         print(f"Early stopping at generation {gen}")
-        ...         return True
-        ...     return False
-        >>>
-        >>> result = ga(
-        ...     init=init,
-        ...     evaluate=evaluate,
-        ...     crossover=crossover,
-        ...     mutate=mutate,
-        ...     pop_size=100,
-        ...     n_generations=1000,
-        ...     callback=early_stop,
-        ...     seed=42
-        ... )
+    Examples
+    --------
+    >>> import numpy as np
+    >>> from ctrl_freak.algorithms.ga import ga
+    >>> def init(rng):
+    ...     return rng.uniform(0.0, 1.0, size=2)
+    >>> def evaluate(x):
+    ...     return float(np.sum(x**2))
+    >>> result = ga(
+    ...     init=init,
+    ...     evaluate=evaluate,
+    ...     crossover=lambda p1, p2: (p1 + p2) / 2,
+    ...     mutate=lambda x: x.copy(),
+    ...     pop_size=10,
+    ...     n_generations=2,
+    ...     seed=1,
+    ... )
+    >>> result.generations
+    2
     """
     # Validate inputs
     if pop_size <= 0:
@@ -245,18 +124,28 @@ def ga(
     parent_selector = SelectionRegistry.get(select) if isinstance(select, str) else select
     survivor_selector = SurvivalRegistry.get(survive) if isinstance(survive, str) else survive
 
-    # Initialize random number generator
-    rng = np.random.default_rng(seed)
+    # Derive independent per-phase RNG streams from the single master seed so one seed
+    # reproduces init + parent selection + crossover + mutation bit-identically.
+    # Child order is the reproducibility contract: [init, select, crossover, mutate]. Never reorder.
+    init_ss, select_ss, crossover_ss, mutate_ss = np.random.SeedSequence(seed).spawn(4)
+    rng = np.random.default_rng(init_ss)
+    select_rng = np.random.default_rng(select_ss)
+    set_crossover_rng = getattr(crossover, "set_rng", None)
+    if callable(set_crossover_rng):
+        set_crossover_rng(np.random.default_rng(crossover_ss))
+    set_mutate_rng = getattr(mutate, "set_rng", None)
+    if callable(set_mutate_rng):
+        set_mutate_rng(np.random.default_rng(mutate_ss))
+
+    def evaluate_array(x: np.ndarray) -> np.ndarray:
+        return np.asarray(evaluate(x))
+
+    # Shared lifted evaluation path. Parallel determinism assumes evaluate is pure.
+    lifted_evaluate = lift_parallel(evaluate_array, n_workers) if n_workers != 1 else lift(evaluate_array)
 
     # Initialize population
     init_x = np.stack([init(rng) for _ in range(pop_size)])
-    # Apply per-individual evaluation (lift expects array->array, so we evaluate manually)
-    if n_workers != 1:
-        init_obj = np.array(Parallel(n_jobs=n_workers)(delayed(evaluate)(init_x[i]) for i in range(pop_size)))
-    else:
-        init_obj = np.array([evaluate(init_x[i]) for i in range(pop_size)])
-
-    # Ensure objectives are shape (n, 1) for single-objective
+    init_obj = lifted_evaluate(init_x)
     if init_obj.ndim == 1:
         init_obj = init_obj.reshape(-1, 1)
 
@@ -291,7 +180,7 @@ def ga(
             break
 
         # Select parents using current state
-        parent_indices = parent_selector(pop, pop_size, rng, **state)
+        parent_indices = parent_selector(pop, pop_size, select_rng, **state)
 
         # Create offspring via crossover and mutation
         offspring_x = np.empty_like(pop.x)
@@ -302,14 +191,7 @@ def ga(
             offspring_x[i] = mutate(child1)
             offspring_x[i + 1] = mutate(child2)
 
-        # Evaluate offspring
-        if n_workers != 1:
-            offspring_obj = np.array(
-                Parallel(n_jobs=n_workers)(delayed(evaluate)(offspring_x[i]) for i in range(pop_size))
-            )
-        else:
-            offspring_obj = np.array([evaluate(offspring_x[i]) for i in range(pop_size)])
-        # Ensure shape (n, 1)
+        offspring_obj = lifted_evaluate(offspring_x)
         if offspring_obj.ndim == 1:
             offspring_obj = offspring_obj.reshape(-1, 1)
         total_evaluations += pop_size
@@ -327,7 +209,7 @@ def ga(
         survivor_indices, state = survivor_selector(
             combined,
             pop_size,
-            parent_size=pop_size,  # type: ignore[arg-type]
+            parent_size=pop_size,  # type: ignore[arg-type]  # ty: ignore[invalid-argument-type]
         )
 
         # Update population

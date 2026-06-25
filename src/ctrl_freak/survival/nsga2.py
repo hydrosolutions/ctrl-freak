@@ -1,8 +1,18 @@
 """NSGA-II survivor selection strategy.
 
-This module implements the NSGA-II survivor selection strategy which uses
-Pareto ranking and crowding distance to select individuals for the next
-generation. This is the core survival mechanism of the NSGA-II algorithm.
+Examples
+--------
+>>> import numpy as np
+>>> from ctrl_freak.population import Population
+>>> from ctrl_freak.survival.nsga2 import nsga2_survival
+>>> obj = np.array([[1.0, 4.0], [2.0, 3.0], [3.0, 2.0], [4.0, 1.0]])
+>>> pop = Population(x=np.zeros((4, 1)), objectives=obj)
+>>> selector = nsga2_survival()
+>>> indices, state = selector(pop, n_survivors=2)
+>>> indices.shape
+(2,)
+>>> sorted(state)
+['crowding_distance', 'rank']
 """
 
 import numpy as np
@@ -23,15 +33,24 @@ def nsga2_survival():
     This preserves both convergence (keeping better fronts) and diversity
     (preferring isolated individuals within a front).
 
-    Returns:
-        A SurvivorSelector callable that selects survivor indices and returns
-        state with 'rank' and 'crowding_distance' arrays.
+    Returns
+    -------
+    callable
+        Survivor selector that returns selected indices and rank/crowding state.
 
-    Example:
-        >>> selector = nsga2_survival()
-        >>> survivors, state = selector(combined_pop, n_survivors=100)
-        >>> rank = state['rank']
-        >>> crowding_distance = state['crowding_distance']
+    Examples
+    --------
+    >>> import numpy as np
+    >>> from ctrl_freak.population import Population
+    >>> from ctrl_freak.survival.nsga2 import nsga2_survival
+    >>> obj = np.array([[1.0, 4.0], [2.0, 3.0], [3.0, 2.0], [4.0, 1.0]])
+    >>> pop = Population(x=np.zeros((4, 1)), objectives=obj)
+    >>> selector = nsga2_survival()
+    >>> indices, state = selector(pop, n_survivors=2)
+    >>> indices.shape
+    (2,)
+    >>> sorted(state)
+    ['crowding_distance', 'rank']
     """
 
     def selector(
@@ -41,32 +60,38 @@ def nsga2_survival():
     ) -> tuple[np.ndarray, dict[str, np.ndarray]]:
         """Select survivors using NSGA-II crowded selection.
 
-        Args:
-            pop: Combined population (typically parents + offspring) to select from.
-            n_survivors: Number of survivors to select for the next generation.
-            **kwargs: Unused. NSGA-II computes all metrics internally.
+        Parameters
+        ----------
+        pop
+            Population to select from.
+        n_survivors
+            Number of survivors to select.
+        **kwargs
+            Unused keyword arguments.
 
-        Returns:
-            Tuple of (indices, state) where:
-            - indices: Array of shape (n_survivors,) containing indices of selected
-              survivors from the input population.
-            - state: Dictionary with keys:
-                - 'rank': Pareto front ranks for selected survivors. Shape (n_survivors,).
-                - 'crowding_distance': Crowding distances for selected survivors.
-                  Shape (n_survivors,). Boundary individuals get infinite distance.
+        Returns
+        -------
+        tuple[numpy.ndarray, dict[str, numpy.ndarray]]
+            Selected indices and state containing ``rank`` and
+            ``crowding_distance`` arrays.
 
-        Raises:
-            ValueError: If population has no objectives, n_survivors is invalid,
-                or n_survivors exceeds population size.
+        Raises
+        ------
+        ValueError
+            If objectives are missing or ``n_survivors`` is invalid.
 
-        Example:
-            >>> x = np.array([[1, 2], [3, 4], [5, 6], [7, 8]])
-            >>> obj = np.array([[1.0, 4.0], [2.0, 3.0], [3.0, 2.0], [4.0, 1.0]])
-            >>> pop = Population(x=x, objectives=obj)
-            >>> selector = nsga2_survival()
-            >>> indices, state = selector(pop, n_survivors=2)
-            >>> len(indices)
-            2
+        Examples
+        --------
+        >>> import numpy as np
+        >>> from ctrl_freak.population import Population
+        >>> from ctrl_freak.survival.nsga2 import nsga2_survival
+        >>> obj = np.array([[1.0, 3.0], [2.0, 2.0], [3.0, 1.0]])
+        >>> pop = Population(x=np.zeros((3, 1)), objectives=obj)
+        >>> indices, state = nsga2_survival()(pop, n_survivors=2)
+        >>> indices.shape
+        (2,)
+        >>> state["rank"].shape
+        (2,)
         """
         if pop.objectives is None:
             raise ValueError("Population must have objectives computed for survivor selection")
@@ -78,42 +103,34 @@ def nsga2_survival():
         # Compute ranks for entire population
         all_ranks = non_dominated_sort(pop.objectives)
 
-        # Fill survivors front-by-front
+        # Fill survivors front-by-front, caching crowding distance as we go.
         selected: list[int] = []
+        selected_cd_parts: list[np.ndarray] = []
         current_rank = 0
 
         while len(selected) < n_survivors:
-            # Get indices of individuals in current front
             front_idx = np.where(all_ranks == current_rank)[0]
 
             if len(selected) + len(front_idx) <= n_survivors:
-                # Whole front fits - add all
+                # Whole front fits: crowding over the full front equals crowding over the
+                # selected subset, so cache it directly.
                 selected.extend(front_idx.tolist())
+                selected_cd_parts.append(crowding_distance(pop.objectives[front_idx]))
             else:
-                # Critical front - select by highest crowding distance
+                # Critical front: select by full-front crowding, then recompute over the
+                # selected subset to match the prior returned-state semantics.
                 remaining = n_survivors - len(selected)
                 cd = crowding_distance(pop.objectives[front_idx])
-                # Sort by crowding distance descending, take top 'remaining'
                 top_cd_indices = np.argsort(cd)[::-1][:remaining]
-                selected.extend(front_idx[top_cd_indices].tolist())
+                chosen = front_idx[top_cd_indices]
+                selected.extend(chosen.tolist())
+                selected_cd_parts.append(crowding_distance(pop.objectives[chosen]))
 
             current_rank += 1
 
         selected_arr = np.array(selected, dtype=np.intp)
-
-        # Compute crowding distance for all fronts in selected survivors
         selected_ranks = all_ranks[selected_arr]
-        selected_cd = np.zeros(n_survivors, dtype=np.float64)
-
-        for r in range(int(selected_ranks.max()) + 1):
-            mask = selected_ranks == r
-            if np.any(mask):
-                # Get indices in selected_arr that belong to this front
-                front_indices = np.where(mask)[0]
-                # Get original population indices for this front
-                original_indices = selected_arr[front_indices]
-                # Compute crowding distance for this front's objectives
-                selected_cd[front_indices] = crowding_distance(pop.objectives[original_indices])
+        selected_cd = np.concatenate(selected_cd_parts).astype(np.float64)
 
         return selected_arr, {
             "rank": selected_ranks,

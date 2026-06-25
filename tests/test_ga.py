@@ -677,6 +677,7 @@ class TestGAParallelEvaluation:
 
     def test_parallel_produces_same_result_as_sequential(self, sphere_problem: dict) -> None:
         """Parallel evaluation should produce identical results to sequential with same seed."""
+
         # Use deterministic operators
         def deterministic_crossover(p1: np.ndarray, p2: np.ndarray) -> np.ndarray:
             return (p1 + p2) / 2
