@@ -203,13 +203,10 @@ def ga(
             objectives=np.concatenate([pop.objectives, offspring_obj]),
         )
 
-        # Select survivors for next generation
-        # For elitist survival, we need to pass parent_size kwarg
-        # Note: parent_size is int but protocol expects np.ndarray; implementations accept both
         survivor_indices, state = survivor_selector(
             combined,
             pop_size,
-            parent_size=pop_size,  # type: ignore[arg-type]  # ty: ignore[invalid-argument-type]
+            parent_size=pop_size,
         )
 
         # Update population

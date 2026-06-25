@@ -22,15 +22,21 @@ class IndividualView:
     This class provides a convenient way to access the data for a single
     individual, returned by Population.__getitem__.
 
-    Attributes:
-        x: Decision variables for this individual, shape (n_vars,).
-        objectives: Objective values for this individual, shape (n_obj,), or None.
+    Attributes
+    ----------
+    x : numpy.ndarray
+        Decision variables for this individual.
+    objectives : numpy.ndarray | None
+        Objective values for this individual, or None.
 
-    Example:
-        >>> pop = Population(x=np.array([[1.0, 2.0], [3.0, 4.0]]))
-        >>> individual = pop[0]
-        >>> individual.x
-        array([1., 2.])
+    Examples
+    --------
+    >>> import numpy as np
+    >>> from ctrl_freak.population import Population
+    >>> pop = Population(x=np.array([[1.0, 2.0], [3.0, 4.0]]))
+    >>> individual = pop[0]
+    >>> individual.x
+    array([1., 2.])
     """
 
     x: np.ndarray
@@ -49,20 +55,26 @@ class Population:
     objective values. Algorithm-specific data (like Pareto ranks or crowding
     distances) should be managed separately by the algorithm implementation.
 
-    Attributes:
-        x: Decision variables for all individuals, shape (n, n_vars).
-        objectives: Objective values, shape (n, n_obj), or None if not evaluated.
+    Attributes
+    ----------
+    x : numpy.ndarray
+        Decision variables for all individuals. Shape is ``(n, n_vars)``.
+    objectives : numpy.ndarray | None
+        Objective values. Shape is ``(n, n_obj)``, or None if not evaluated.
 
-    Example:
-        >>> x = np.array([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]])
-        >>> obj = np.array([[0.5, 0.5], [0.3, 0.7], [0.4, 0.6]])
-        >>> pop = Population(x=x, objectives=obj)
-        >>> len(pop)
-        3
-        >>> pop.n_vars
-        2
-        >>> pop.n_obj
-        2
+    Examples
+    --------
+    >>> import numpy as np
+    >>> from ctrl_freak.population import Population
+    >>> x = np.array([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]])
+    >>> obj = np.array([[0.5, 0.5], [0.3, 0.7], [0.4, 0.6]])
+    >>> pop = Population(x=x, objectives=obj)
+    >>> len(pop)
+    3
+    >>> pop.n_vars
+    2
+    >>> pop.n_obj
+    2
     """
 
     x: np.ndarray
@@ -71,9 +83,12 @@ class Population:
     def __post_init__(self) -> None:
         """Validate shapes and copy arrays for immutability.
 
-        Raises:
-            TypeError: If x is not a numpy array.
-            ValueError: If array shapes are inconsistent or invalid.
+        Raises
+        ------
+        TypeError
+            If x is not a numpy array.
+        ValueError
+            If array shapes are inconsistent or invalid.
         """
         # Validate x
         if not isinstance(self.x, np.ndarray):
@@ -99,30 +114,42 @@ class Population:
     def __len__(self) -> int:
         """Return the number of individuals in the population.
 
-        Returns:
-            Number of individuals (rows in x).
+        Returns
+        -------
+        int
+            Number of individuals.
         """
         return self.x.shape[0]
 
     def __getitem__(self, idx: int) -> IndividualView:
         """Get a read-only view of a single individual.
 
-        Args:
-            idx: Index of the individual (supports negative indexing).
+        Parameters
+        ----------
+        idx : int
+            Index of the individual. Negative indexing is supported.
 
-        Returns:
-            IndividualView containing the data for the specified individual.
+        Returns
+        -------
+        IndividualView
+            Data for the specified individual.
 
-        Raises:
-            TypeError: If idx is not an integer.
-            IndexError: If idx is out of bounds.
+        Raises
+        ------
+        TypeError
+            If idx is not an integer.
+        IndexError
+            If idx is out of bounds.
 
-        Example:
-            >>> pop = Population(x=np.array([[1.0, 2.0], [3.0, 4.0]]))
-            >>> pop[0].x
-            array([1., 2.])
-            >>> pop[-1].x
-            array([3., 4.])
+        Examples
+        --------
+        >>> import numpy as np
+        >>> from ctrl_freak.population import Population
+        >>> pop = Population(x=np.array([[1.0, 2.0], [3.0, 4.0]]))
+        >>> pop[0].x
+        array([1., 2.])
+        >>> pop[-1].x
+        array([3., 4.])
         """
         if not isinstance(idx, (int, np.integer)):
             raise TypeError(f"indices must be integers, got {type(idx).__name__}")
@@ -144,8 +171,10 @@ class Population:
     def n_individuals(self) -> int:
         """Return the number of individuals in the population.
 
-        Returns:
-            Number of individuals (same as len(self)).
+        Returns
+        -------
+        int
+            Number of individuals.
         """
         return self.x.shape[0]
 
@@ -153,8 +182,10 @@ class Population:
     def n_vars(self) -> int:
         """Return the number of decision variables per individual.
 
-        Returns:
-            Number of decision variables (columns in x).
+        Returns
+        -------
+        int
+            Number of decision variables.
         """
         return self.x.shape[1]
 
@@ -162,8 +193,10 @@ class Population:
     def n_obj(self) -> int | None:
         """Return the number of objectives, or None if not evaluated.
 
-        Returns:
-            Number of objectives (columns in objectives), or None if objectives is None.
+        Returns
+        -------
+        int | None
+            Number of objectives, or None if objectives is None.
         """
         if self.objectives is None:
             return None

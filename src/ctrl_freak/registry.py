@@ -15,39 +15,20 @@ There are two independent registries:
 1. **SelectionRegistry**: For parent selection strategies (ParentSelector protocol)
 2. **SurvivalRegistry**: For survivor selection strategies (SurvivorSelector protocol)
 
-Basic usage:
-    ```python
+Examples
+--------
+Strategies are registered as factories and retrieved by name::
+
     from ctrl_freak.registry import SelectionRegistry, list_selections
 
-    # Register a strategy factory
-    def tournament_factory(size: int = 2):
+    def tournament_factory(size=2):
         def tournament_selector(pop, n_parents, rng, **kwargs):
-            # Implementation here
             ...
         return tournament_selector
 
     SelectionRegistry.register("tournament", tournament_factory)
-
-    # Get a configured selector
     selector = SelectionRegistry.get("tournament", size=3)
-
-    # List available strategies
-    available = list_selections()  # ["tournament", ...]
-    ```
-
-Advanced usage with lambdas:
-    ```python
-    from ctrl_freak.registry import SurvivalRegistry
-
-    # Register with lambda factory
-    SurvivalRegistry.register(
-        "truncation",
-        lambda minimize=True: truncation_selector(minimize)
-    )
-
-    # Get with custom configuration
-    selector = SurvivalRegistry.get("truncation", minimize=False)
-    ```
+    available = list_selections()
 """
 
 from collections.abc import Callable
@@ -66,30 +47,22 @@ class SelectionRegistry:
     return ParentSelector callables. This enables flexible configuration at
     retrieval time.
 
-    Class Attributes:
-        _registry: Dictionary mapping strategy names to factory functions.
-            Keys are strategy names (str), values are callables that return
-            ParentSelector instances.
+    Attributes
+    ----------
+    _registry : dict[str, Callable[..., ParentSelector]]
+        Mapping from strategy names to factory functions.
 
-    Example:
-        ```python
-        # Define a strategy factory
-        def tournament_factory(size: int = 2):
+    Examples
+    --------
+    A strategy factory returns a callable that satisfies ``ParentSelector``::
+
+        def tournament_factory(size=2):
             def selector(pop, n_parents, rng, **kwargs):
-                fitness = kwargs.get('fitness')
-                # Tournament selection implementation
                 ...
             return selector
 
-        # Register the factory
         SelectionRegistry.register("tournament", tournament_factory)
-
-        # Retrieve configured selector
         selector = SelectionRegistry.get("tournament", size=5)
-
-        # List all strategies
-        strategies = SelectionRegistry.list()  # ["tournament"]
-        ```
     """
 
     _registry: dict[str, Callable[..., ParentSelector]] = {}
@@ -102,28 +75,22 @@ class SelectionRegistry:
         a ParentSelector. This enables strategies to be configured at retrieval
         time with custom parameters.
 
-        Args:
-            name: Unique name for the strategy. Will overwrite if already exists.
-            factory: Callable that returns a ParentSelector. Should accept
-                keyword arguments for configuration.
+        Parameters
+        ----------
+        name : str
+            Unique name for the strategy. Existing names are overwritten.
+        factory : Callable[..., ParentSelector]
+            Callable that returns a parent selector.
 
-        Example:
-            ```python
-            # Register a simple factory
-            SelectionRegistry.register(
-                "random",
-                lambda: lambda pop, n, rng, **kw: rng.choice(len(pop), n)
-            )
-
-            # Register a configurable factory
-            def tournament_factory(size: int = 2):
-                def selector(pop, n_parents, rng, **kwargs):
-                    # Use 'size' parameter
-                    ...
-                return selector
-
-            SelectionRegistry.register("tournament", tournament_factory)
-            ```
+        Examples
+        --------
+        >>> from ctrl_freak.registry import SelectionRegistry
+        >>> SelectionRegistry.register(
+        ...     "__doc_random__",
+        ...     lambda: lambda pop, n_parents, rng, **kw: rng.choice(len(pop), n_parents),
+        ... )
+        >>> "__doc_random__" in SelectionRegistry.list()
+        True
         """
         cls._registry[name] = factory
 
@@ -134,28 +101,30 @@ class SelectionRegistry:
         Retrieves the factory for the given strategy name and calls it with
         the provided keyword arguments to create a configured selector.
 
-        Args:
-            name: Name of the registered strategy.
-            **kwargs: Configuration parameters passed to the factory function.
+        Parameters
+        ----------
+        name : str
+            Name of the registered strategy.
+        **kwargs
+            Configuration parameters passed to the factory function.
 
-        Returns:
-            A configured ParentSelector callable.
+        Returns
+        -------
+        ParentSelector
+            A configured parent selector callable.
 
-        Raises:
-            KeyError: If the strategy name is not registered. Error message
-                includes list of available strategies.
+        Raises
+        ------
+        KeyError
+            If the strategy name is not registered.
 
-        Example:
-            ```python
-            # Get with default configuration
-            selector = SelectionRegistry.get("tournament")
-
-            # Get with custom configuration
-            selector = SelectionRegistry.get("tournament", size=5)
-
-            # Use the selector
-            parent_indices = selector(pop, n_parents=20, rng=rng, fitness=fitness)
-            ```
+        Examples
+        --------
+        >>> from ctrl_freak.registry import SelectionRegistry
+        >>> SelectionRegistry.register("__doc_empty__", lambda: lambda pop, n, rng, **kw: [])
+        >>> selector = SelectionRegistry.get("__doc_empty__")
+        >>> callable(selector)
+        True
         """
         if name not in cls._registry:
             available = ", ".join(sorted(cls._registry.keys())) or "none"
@@ -167,14 +136,16 @@ class SelectionRegistry:
     def list(cls) -> list[str]:
         """Return list of registered strategy names.
 
-        Returns:
+        Returns
+        -------
+        list[str]
             Sorted list of all registered parent selection strategy names.
 
-        Example:
-            ```python
-            strategies = SelectionRegistry.list()
-            print(f"Available: {', '.join(strategies)}")
-            ```
+        Examples
+        --------
+        >>> from ctrl_freak.registry import SelectionRegistry
+        >>> isinstance(SelectionRegistry.list(), list)
+        True
         """
         return sorted(cls._registry.keys())
 
@@ -190,33 +161,22 @@ class SurvivalRegistry:
     return SurvivorSelector callables. This enables flexible configuration at
     retrieval time.
 
-    Class Attributes:
-        _registry: Dictionary mapping strategy names to factory functions.
-            Keys are strategy names (str), values are callables that return
-            SurvivorSelector instances.
+    Attributes
+    ----------
+    _registry : dict[str, Callable[..., SurvivorSelector]]
+        Mapping from strategy names to factory functions.
 
-    Example:
-        ```python
-        # Define a strategy factory
-        def nsga2_factory(preserve_diversity: bool = True):
+    Examples
+    --------
+    A strategy factory returns a callable that satisfies ``SurvivorSelector``::
+
+        def nsga2_factory(preserve_diversity=True):
             def selector(pop, n_survivors, **kwargs):
-                # NSGA-II implementation
-                rank = non_dominated_sort(pop.objectives)
-                crowding = compute_crowding(pop.objectives, rank)
-                # Truncation logic
                 ...
-                return indices, {'rank': rank, 'crowding_distance': crowding}
             return selector
 
-        # Register the factory
         SurvivalRegistry.register("nsga2", nsga2_factory)
-
-        # Retrieve configured selector
         selector = SurvivalRegistry.get("nsga2", preserve_diversity=False)
-
-        # List all strategies
-        strategies = SurvivalRegistry.list()  # ["nsga2"]
-        ```
     """
 
     _registry: dict[str, Callable[..., SurvivorSelector]] = {}
@@ -229,30 +189,23 @@ class SurvivalRegistry:
         a SurvivorSelector. This enables strategies to be configured at retrieval
         time with custom parameters.
 
-        Args:
-            name: Unique name for the strategy. Will overwrite if already exists.
-            factory: Callable that returns a SurvivorSelector. Should accept
-                keyword arguments for configuration.
+        Parameters
+        ----------
+        name : str
+            Unique name for the strategy. Existing names are overwritten.
+        factory : Callable[..., SurvivorSelector]
+            Callable that returns a survivor selector.
 
-        Example:
-            ```python
-            # Register a simple factory
-            SurvivalRegistry.register(
-                "truncation",
-                lambda: lambda pop, n, **kw: (np.argsort(pop.objectives[:, 0])[:n], {})
-            )
-
-            # Register a configurable factory
-            def elitist_factory(elite_fraction: float = 0.1):
-                def selector(pop, n_survivors, **kwargs):
-                    n_elite = int(n_survivors * elite_fraction)
-                    # Selection logic using elite_fraction
-                    ...
-                    return indices, state
-                return selector
-
-            SurvivalRegistry.register("elitist", elitist_factory)
-            ```
+        Examples
+        --------
+        >>> import numpy as np
+        >>> from ctrl_freak.registry import SurvivalRegistry
+        >>> SurvivalRegistry.register(
+        ...     "__doc_truncation__",
+        ...     lambda: lambda pop, n, **kw: (np.arange(n), {}),
+        ... )
+        >>> "__doc_truncation__" in SurvivalRegistry.list()
+        True
         """
         cls._registry[name] = factory
 
@@ -263,28 +216,30 @@ class SurvivalRegistry:
         Retrieves the factory for the given strategy name and calls it with
         the provided keyword arguments to create a configured selector.
 
-        Args:
-            name: Name of the registered strategy.
-            **kwargs: Configuration parameters passed to the factory function.
+        Parameters
+        ----------
+        name : str
+            Name of the registered strategy.
+        **kwargs
+            Configuration parameters passed to the factory function.
 
-        Returns:
-            A configured SurvivorSelector callable.
+        Returns
+        -------
+        SurvivorSelector
+            A configured survivor selector callable.
 
-        Raises:
-            KeyError: If the strategy name is not registered. Error message
-                includes list of available strategies.
+        Raises
+        ------
+        KeyError
+            If the strategy name is not registered.
 
-        Example:
-            ```python
-            # Get with default configuration
-            selector = SurvivalRegistry.get("nsga2")
-
-            # Get with custom configuration
-            selector = SurvivalRegistry.get("elitist", elite_fraction=0.2)
-
-            # Use the selector
-            survivor_indices, state = selector(combined_pop, n_survivors=100)
-            ```
+        Examples
+        --------
+        >>> from ctrl_freak.registry import SurvivalRegistry
+        >>> SurvivalRegistry.register("__doc_survivor__", lambda: lambda pop, n, **kw: ([], {}))
+        >>> selector = SurvivalRegistry.get("__doc_survivor__")
+        >>> callable(selector)
+        True
         """
         if name not in cls._registry:
             available = ", ".join(sorted(cls._registry.keys())) or "none"
@@ -296,14 +251,16 @@ class SurvivalRegistry:
     def list(cls) -> list[str]:
         """Return list of registered strategy names.
 
-        Returns:
+        Returns
+        -------
+        list[str]
             Sorted list of all registered survivor selection strategy names.
 
-        Example:
-            ```python
-            strategies = SurvivalRegistry.list()
-            print(f"Available: {', '.join(strategies)}")
-            ```
+        Examples
+        --------
+        >>> from ctrl_freak.registry import SurvivalRegistry
+        >>> isinstance(SurvivalRegistry.list(), list)
+        True
         """
         return sorted(cls._registry.keys())
 
@@ -313,17 +270,16 @@ def list_selections() -> list[str]:
 
     Convenience function that returns SelectionRegistry.list().
 
-    Returns:
+    Returns
+    -------
+    list[str]
         Sorted list of all registered parent selection strategy names.
 
-    Example:
-        ```python
-        from ctrl_freak.registry import list_selections
-
-        strategies = list_selections()
-        for name in strategies:
-            print(f"- {name}")
-        ```
+    Examples
+    --------
+    >>> from ctrl_freak.registry import list_selections
+    >>> isinstance(list_selections(), list)
+    True
     """
     return SelectionRegistry.list()
 
@@ -333,16 +289,15 @@ def list_survivals() -> list[str]:
 
     Convenience function that returns SurvivalRegistry.list().
 
-    Returns:
+    Returns
+    -------
+    list[str]
         Sorted list of all registered survivor selection strategy names.
 
-    Example:
-        ```python
-        from ctrl_freak.registry import list_survivals
-
-        strategies = list_survivals()
-        for name in strategies:
-            print(f"- {name}")
-        ```
+    Examples
+    --------
+    >>> from ctrl_freak.registry import list_survivals
+    >>> isinstance(list_survivals(), list)
+    True
     """
     return SurvivalRegistry.list()

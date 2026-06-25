@@ -1,7 +1,6 @@
-"""Tests for the NSGA-II algorithm module.
+"""Tests for the plural NSGA-II algorithm module.
 
 This module tests:
-- survivor_selection: Correct size, preserves Pareto front, uses crowding for critical front
 - nsga2: Integration tests for the main algorithm
 - Callbacks: Early stopping behavior
 - Property-based tests: Invariants that must hold
@@ -16,7 +15,6 @@ from ctrl_freak import (
     crowding_distance,
     non_dominated_sort,
     nsga2,
-    survivor_selection,
 )
 
 
@@ -27,111 +25,6 @@ def _compute_crowding_for_all_fronts(objectives: np.ndarray, ranks: np.ndarray) 
         mask = ranks == r
         cd[mask] = crowding_distance(objectives[mask])
     return cd
-
-
-# =============================================================================
-# TestSurvivorSelection
-# =============================================================================
-
-
-class TestSurvivorSelection:
-    """Tests for the survivor_selection function."""
-
-    def test_returns_correct_size(self, simple_population: Population) -> None:
-        """Survivor selection returns exactly n_survivors individuals."""
-        result = survivor_selection(simple_population, 2)
-        assert len(result) == 2
-
-    def test_preserves_population_type(self, simple_population: Population) -> None:
-        """Result is a Population instance."""
-        result = survivor_selection(simple_population, 2)
-        assert isinstance(result, Population)
-
-    def test_has_objectives(self, simple_population: Population) -> None:
-        """Returned population has objectives array."""
-        result = survivor_selection(simple_population, 2)
-        assert result.objectives is not None
-        assert len(result.objectives) == 2
-
-    def test_preserves_pareto_front(self) -> None:
-        """All Pareto-optimal individuals are preserved when possible."""
-        # Create population with 2 rank-0 and 2 rank-1 individuals
-        x = np.array([[1, 1], [2, 2], [3, 3], [4, 4]])
-        objectives = np.array([[1.0, 4.0], [4.0, 1.0], [2.0, 2.0], [3.0, 3.0]])
-        # [1,4] and [4,1] are Pareto-optimal; [2,2] dominates [3,3]
-
-        pop = Population(x=x, objectives=objectives)
-        result = survivor_selection(pop, 3)
-
-        # Both Pareto-optimal points should be in survivors
-        result_obj_set = {tuple(row) for row in result.objectives}
-        assert (1.0, 4.0) in result_obj_set
-        assert (4.0, 1.0) in result_obj_set
-
-    def test_uses_crowding_for_critical_front(self) -> None:
-        """Critical front selection uses crowding distance."""
-        # Create 5 individuals, all in same front (none dominate each other)
-        x = np.array([[1, 1], [2, 2], [3, 3], [4, 4], [5, 5]])
-        # All on Pareto front (non-dominated): forming a line in objective space
-        objectives = np.array(
-            [
-                [1.0, 5.0],  # boundary - inf crowding
-                [2.0, 4.0],  # interior
-                [3.0, 3.0],  # interior - central, lower crowding
-                [4.0, 2.0],  # interior
-                [5.0, 1.0],  # boundary - inf crowding
-            ]
-        )
-
-        pop = Population(x=x, objectives=objectives)
-        result = survivor_selection(pop, 3)
-
-        # Boundary points should be preserved (inf crowding distance)
-        result_obj_set = {tuple(row) for row in result.objectives}
-        assert (1.0, 5.0) in result_obj_set
-        assert (5.0, 1.0) in result_obj_set
-
-    def test_selects_all_when_n_survivors_equals_pop_size(self, simple_population: Population) -> None:
-        """When n_survivors equals population size, all are selected."""
-        result = survivor_selection(simple_population, len(simple_population))
-        assert len(result) == len(simple_population)
-
-    def test_raises_on_no_objectives(self) -> None:
-        """Raises ValueError if population has no objectives."""
-        pop = Population(x=np.array([[1, 2], [3, 4]]), objectives=None)
-        with pytest.raises(ValueError, match="objectives"):
-            survivor_selection(pop, 1)
-
-    def test_raises_on_zero_survivors(self, simple_population: Population) -> None:
-        """Raises ValueError for n_survivors <= 0."""
-        with pytest.raises(ValueError, match="positive"):
-            survivor_selection(simple_population, 0)
-
-    def test_raises_on_negative_survivors(self, simple_population: Population) -> None:
-        """Raises ValueError for negative n_survivors."""
-        with pytest.raises(ValueError, match="positive"):
-            survivor_selection(simple_population, -1)
-
-    def test_raises_when_n_survivors_exceeds_pop_size(self, simple_population: Population) -> None:
-        """Raises ValueError when n_survivors > population size."""
-        with pytest.raises(ValueError, match="cannot exceed"):
-            survivor_selection(simple_population, len(simple_population) + 1)
-
-    def test_survivors_have_correct_ranks_when_recomputed(self) -> None:
-        """Ranks recomputed for survivors are correct."""
-        # Create population where removing some individuals changes ranks
-        x = np.array([[1, 1], [2, 2], [3, 3], [4, 4]])
-        objectives = np.array([[1.0, 4.0], [4.0, 1.0], [2.0, 2.0], [3.0, 3.0]])
-        # [1,4] and [4,1] are rank 0; [2,2] is rank 1 (dominated by both); [3,3] is rank 2
-
-        pop = Population(x=x, objectives=objectives)
-        result = survivor_selection(pop, 3)
-
-        # Compute ranks for the result and verify they are valid
-        result_ranks = non_dominated_sort(result.objectives)
-        # All ranks should be non-negative and form a proper ranking
-        assert np.all(result_ranks >= 0)
-        assert 0 in result_ranks  # At least one rank 0
 
 
 # =============================================================================
@@ -684,6 +577,7 @@ class TestNSGA2ParallelEvaluation:
 
     def test_parallel_produces_same_result_as_sequential(self, simple_biobj_problem: dict) -> None:
         """Parallel evaluation should produce identical results to sequential with same seed."""
+
         # Use deterministic operators
         def deterministic_mutate(x: np.ndarray) -> np.ndarray:
             return x.copy()

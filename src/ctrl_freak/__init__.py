@@ -11,7 +11,7 @@ Example (multi-objective with NSGA-II):
     >>> def crossover(p1, p2): return (p1 + p2) / 2
     >>> def mutate(x): return np.clip(x + 0.01, 0, 1)
     >>> result = nsga2(init, evaluate, crossover, mutate, pop_size=10, n_generations=5, seed=42)
-    >>> len(result)
+    >>> len(result.population)
     10
 
 Example (single-objective with GA):
@@ -22,11 +22,12 @@ Example (single-objective with GA):
     >>> def crossover(p1, p2): return (p1 + p2) / 2
     >>> def mutate(x): return np.clip(x + 0.01, 0, 1)
     >>> result = ga(init, evaluate, crossover, mutate, pop_size=10, n_generations=5, seed=42)
-    >>> len(result)
+    >>> len(result.population)
     10
 """
 
-from ctrl_freak.algorithm import survivor_selection
+from importlib.metadata import version
+
 from ctrl_freak.algorithms import ga, nsga2
 from ctrl_freak.operators import (
     create_offspring,
@@ -43,6 +44,7 @@ from ctrl_freak.primitives import (
     dominates_matrix,
     non_dominated_sort,
 )
+from ctrl_freak.protocols import ParentSelector, SurvivorSelector
 from ctrl_freak.registry import (
     SelectionRegistry,
     SurvivalRegistry,
@@ -52,6 +54,8 @@ from ctrl_freak.registry import (
 from ctrl_freak.results import GAResult, NSGA2Result
 from ctrl_freak.selection import crowded_tournament, fitness_tournament, roulette_wheel
 from ctrl_freak.survival import elitist_survival, nsga2_survival, truncation_survival
+
+__version__ = version("ctrl-freak")
 
 __all__ = [
     # Algorithms
@@ -82,12 +86,15 @@ __all__ = [
     "SurvivalRegistry",
     "list_selections",
     "list_survivals",
+    # Protocols
+    "ParentSelector",
+    "SurvivorSelector",
     # Data structures
     "Population",
     "IndividualView",
     # Result types
     "NSGA2Result",
     "GAResult",
-    # Legacy
-    "survivor_selection",
+    # Version
+    "__version__",
 ]
