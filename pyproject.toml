@@ -49,6 +49,7 @@ build-backend = "uv_build"
 [dependency-groups]
 dev = [
     "deap>=1.4.3",
+    "matplotlib>=3.10.8",
     "pymoo>=0.6.1.6",
     "pytest>=8.3", # tests
     "pytest-cov>=6.2.1",
@@ -92,7 +93,7 @@ possibly-unresolved-reference = "warn"
 # Pytest
 # -----------------------
 [tool.pytest.ini_options]
-pythonpath = ["src"]
+pythonpath = ["src", "."]
 testpaths = ["tests"]
 python_files = ["test_*.py", "*_test.py"]
 python_classes = ["Test*"]
