@@ -62,10 +62,15 @@ def identity_mutate():
 
 @pytest.fixture
 def small_perturbation_mutate():
-    """Mutation that adds small random perturbation."""
+    """Mutation that adds a small seeded random perturbation.
+
+    Uses a fixture-local seeded ``numpy.random.Generator`` so the mutation is
+    reproducible and independent of global RNG state (no latent flakiness).
+    """
+    perturbation_rng = np.random.default_rng(0xC0FFEE)
 
     def mutate(x: np.ndarray) -> np.ndarray:
-        return x + 0.01 * np.random.randn(len(x))
+        return x + 0.01 * perturbation_rng.standard_normal(len(x))
 
     return mutate
 
@@ -147,6 +152,7 @@ def simple_biobj_problem():
         Dict with init, evaluate, crossover, and mutate functions.
     """
     n_vars = 3
+    mutation_rng = np.random.default_rng(0xBADC0DE)
 
     def init(rng: np.random.Generator) -> np.ndarray:
         return rng.uniform(0, 1, size=n_vars)
@@ -158,7 +164,7 @@ def simple_biobj_problem():
         return (p1 + p2) / 2
 
     def mutate(x: np.ndarray) -> np.ndarray:
-        return np.clip(x + 0.01 * np.random.randn(len(x)), 0, 1)
+        return np.clip(x + 0.01 * mutation_rng.standard_normal(len(x)), 0, 1)
 
     return {"init": init, "evaluate": evaluate, "crossover": crossover, "mutate": mutate}
 
