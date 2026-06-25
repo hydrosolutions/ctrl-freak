@@ -1,13 +1,45 @@
 [project]
 name = "ctrl-freak"
 version = "0.1.0"
-description = "Pure numpy implementation of NSGA-II multi-objective genetic algorithm"
+description = "Pure-numpy genetic algorithm framework for single-objective (GA) and multi-objective (NSGA-II) optimization"
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.11"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Nicolas Lazaro" }]
+keywords = [
+    "genetic-algorithm",
+    "evolutionary-algorithm",
+    "optimization",
+    "multi-objective-optimization",
+    "nsga-ii",
+    "nsga2",
+    "pareto",
+    "numpy",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering",
+    "Topic :: Scientific/Engineering :: Mathematics",
+    "Operating System :: OS Independent",
+]
 dependencies = [
-    "numpy>=2.4.1",
+    "numpy>=2.0",
     "joblib>=1.3.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/hydrosolutions/ctrl-freak"
+Repository = "https://github.com/hydrosolutions/ctrl-freak"
+Documentation = "https://hydrosolutions.github.io/ctrl-freak/"
+Changelog = "https://github.com/hydrosolutions/ctrl-freak/blob/main/CHANGELOG.md"
+Issues = "https://github.com/hydrosolutions/ctrl-freak/issues"
 
 
 [build-system]
@@ -18,10 +50,14 @@ build-backend = "uv_build"
 dev = [
     "deap>=1.4.3",
     "pymoo>=0.6.1.6",
-    "pyright>=1.1.408",
     "pytest>=8.3", # tests
     "pytest-cov>=6.2.1",
     "ruff>=0.12", # linter + formatter
+    "ty>=0.0.53",
+]
+docs = [
+    "mkdocs-material>=9.5",
+    "mkdocstrings[python]>=0.26",
 ]
 
 # -----------------------
@@ -29,7 +65,7 @@ dev = [
 # -----------------------
 [tool.ruff]
 line-length = 120
-target-version = "py312"
+target-version = "py311"
 extend-exclude = ["notebooks/", "experiments/"]
 
 [tool.ruff.lint]
@@ -67,6 +103,24 @@ addopts = [
     "-ra",
     "--ignore=notebooks/",
     "--ignore=experiments/",
+    "--cov=ctrl_freak",
+    "--cov-report=term-missing",
+]
+
+# -----------------------
+# Coverage
+# -----------------------
+[tool.coverage.run]
+source = ["ctrl_freak"]
+branch = false
+
+[tool.coverage.report]
+fail_under = 90
+show_missing = true
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
 ]
 
 [tool.uv.sources]
