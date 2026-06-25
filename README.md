@@ -1,19 +1,21 @@
 # ctrl-freak
 
+[![PyPI](https://img.shields.io/pypi/v/ctrl-freak.svg)](https://pypi.org/project/ctrl-freak/)
+[![Python](https://img.shields.io/pypi/pyversions/ctrl-freak.svg)](https://pypi.org/project/ctrl-freak/)
+[![License](https://img.shields.io/pypi/l/ctrl-freak.svg)](LICENSE)
+
 An extensible genetic algorithm framework for single and multi-objective optimization, built on pure numpy.
-
-## Maintenance Status
-
-🟢 **Active Development**
-
-This repository is part of an ongoing project and actively maintained.
-
----
 
 ## Installation
 
 ```bash
 uv add ctrl-freak
+```
+
+or:
+
+```bash
+pip install ctrl-freak
 ```
 
 ## Quick Start
@@ -68,143 +70,22 @@ result = ga(
 print(f"Best fitness: {result.best[1]:.6f}")
 ```
 
-## Documentation
+## Features
 
-- [API Usage Guide](docs/usage.md) — Installation, examples, working with results
-- [User Contracts](docs/contracts.md) — Function signatures and responsibilities
+- Single-objective optimization with `ga()`.
+- Multi-objective optimization with `nsga2()`.
+- Pluggable parent-selection and survival strategies.
+- Pure numpy primitives for Pareto dominance, non-dominated sorting, and crowding distance.
+- Parallel evaluation through `n_workers`.
 
----
-
-## Design Philosophy
-
-- **Pure numpy** for performance
-- **Functional style** with immutable data structures
-- **User thinks about individuals**, framework handles vectorization via `lift()`
-- **Fail fast** with eager validation
-- **Domain agnostic** — framework handles selection pressure, user handles constraints/bounds
-- **Extensible** via pluggable selection and survival strategies
-
-## Architecture
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│  User Domain Layer                                          │
-│  init(), evaluate(), crossover(), mutate()                  │
-│  (per-individual, user-defined)                             │
-└─────────────────────────────────────────────────────────────┘
-                          │ lift()
-                          ▼
-┌─────────────────────────────────────────────────────────────┐
-│  Algorithm Layer                                            │
-│  ┌─────────────┐    ┌─────────────┐                         │
-│  │   nsga2()   │    │    ga()     │                         │
-│  │ multi-obj   │    │ single-obj  │                         │
-│  └─────────────┘    └─────────────┘                         │
-│         │                  │                                │
-│         └────────┬─────────┘                                │
-│                  ▼                                          │
-│  ┌───────────────────────────────────────────────────────┐  │
-│  │  Pluggable Strategies                                 │  │
-│  │  Selection: crowded, tournament, roulette             │  │
-│  │  Survival: nsga2, truncation, elitist                 │  │
-│  └───────────────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────────────┘
-                          │
-                          ▼
-┌─────────────────────────────────────────────────────────────┐
-│  Primitives (pure functions)                                │
-│  non_dominated_sort(), crowding_distance(), dominates()     │
-└─────────────────────────────────────────────────────────────┘
-```
-
-## API Reference
-
-### Algorithms
-
-```python
-# Multi-objective optimization
-nsga2(init, evaluate, crossover, mutate, pop_size, n_generations,
-      seed=None, callback=None, select='crowded', survive='nsga2',
-      n_workers=1) -> NSGA2Result
-
-# Single-objective optimization
-ga(init, evaluate, crossover, mutate, pop_size, n_generations,
-   seed=None, callback=None, select='tournament', survive='elitist',
-   n_workers=1) -> GAResult
-```
-
-### User Function Contracts
-
-| Function | Signature | Description |
-|----------|-----------|-------------|
-| `init` | `(rng) -> (n_vars,)` | Initialize one random individual |
-| `evaluate` | `(n_vars,) -> (n_obj,)` or `float` | Compute objectives (minimization) |
-| `crossover` | `(n_vars,), (n_vars,) -> (n_vars,)` | Combine two parents into one child |
-| `mutate` | `(n_vars,) -> (n_vars,)` | Perturb an individual |
-
-### Result Types
-
-**NSGA2Result** — Multi-objective optimization result:
-
-- `population: Population` — Final population
-- `rank: np.ndarray` — Pareto front ranks `(n,)` where 0 = optimal
-- `crowding_distance: np.ndarray` — Diversity measure `(n,)`
-- `pareto_front: Population` — Property returning rank-0 individuals
-- `generations: int` — Generations completed
-- `evaluations: int` — Total evaluations
-
-**GAResult** — Single-objective optimization result:
-
-- `population: Population` — Final population
-- `fitness: np.ndarray` — Fitness values `(n,)`
-- `best: tuple[np.ndarray, float]` — Property returning (best_x, best_fitness)
-- `generations: int` — Generations completed
-- `evaluations: int` — Total evaluations
-
-### Data Structures
-
-**Population** — Immutable collection of solutions:
-
-- `x: np.ndarray` — Decision variables `(n, n_vars)`
-- `objectives: np.ndarray | None` — Objective values `(n, n_obj)`
-
-### Selection Strategies
-
-| Name | Function | Use Case |
-|------|----------|----------|
-| `'crowded'` | `crowded_tournament()` | NSGA-II (rank + crowding) |
-| `'tournament'` | `fitness_tournament()` | GA (fitness-based) |
-| `'roulette'` | `roulette_wheel()` | GA (fitness-proportionate) |
-
-### Survival Strategies
-
-| Name | Function | Use Case |
-|------|----------|----------|
-| `'nsga2'` | `nsga2_survival()` | NSGA-II (fronts + crowding) |
-| `'truncation'` | `truncation_survival()` | Keep best k |
-| `'elitist'` | `elitist_survival()` | Preserve elite parents |
-
-### Primitives
-
-| Function | Description |
-|----------|-------------|
-| `dominates(a, b)` | Check if `a` Pareto-dominates `b` |
-| `dominates_matrix(objectives)` | Pairwise dominance matrix |
-| `non_dominated_sort(objectives)` | Assign Pareto front ranks |
-| `crowding_distance(front)` | Compute crowding distances for one front |
-
----
+See the [full documentation](https://hydrosolutions.github.io/ctrl-freak/) for API details, user contracts, examples, and extension points.
 
 ## Benchmarks
 
-Tested against Pymoo and DEAP on ZDT test problems (100 pop, 250 generations, 10 seeds):
+See [benchmarks/](benchmarks/) for the comparison suite.
 
-| Problem | ctrl-freak | Pymoo | DEAP |
-|---------|------------|-------|------|
-| ZDT1 | 0.8653 ± 0.0011 | 0.8241 ± 0.0255 | **0.8698 ± 0.0002** |
-| ZDT2 | 0.5320 ± 0.0017 | 0.4764 ± 0.0182 | **0.5363 ± 0.0002** |
-| ZDT3 | 1.3224 ± 0.0008 | 1.2836 ± 0.0123 | **1.3275 ± 0.0002** |
+## Links
 
-ctrl-freak matches DEAP-level hypervolume on ZDT1-3 with low variance. See [full benchmark results](benchmarks/README.md).
-
----
+- [Documentation](https://hydrosolutions.github.io/ctrl-freak/)
+- [Changelog](CHANGELOG.md)
+- [License](LICENSE)

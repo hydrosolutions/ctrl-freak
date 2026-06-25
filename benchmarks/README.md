@@ -44,28 +44,7 @@ All libraries configured with identical parameters:
 
 ## Results
 
-### Hypervolume (mean +/- std)
-
-| Problem | ctrl-freak | Pymoo | DEAP |
-|---------|------------|-------|------|
-| ZDT1 | 0.8688 +/- 0.0006 | 0.8241 +/- 0.0255 | **0.8698 +/- 0.0002** |
-| ZDT2 | 0.5356 +/- 0.0004 | 0.4764 +/- 0.0182 | **0.5363 +/- 0.0002** |
-| ZDT3 | 1.3261 +/- 0.0006 | 1.2836 +/- 0.0123 | **1.3275 +/- 0.0002** |
-
-### Timing (mean seconds per run)
-
-| Problem | ctrl-freak | Pymoo | DEAP |
-|---------|------------|-------|------|
-| ZDT1 | 0.74 | **0.34** | 1.85 |
-| ZDT2 | 0.76 | **0.34** | 1.89 |
-| ZDT3 | 0.77 | **0.35** | 1.88 |
-
-### Key Findings
-
-1. **Quality**: ctrl-freak matches DEAP's hypervolume within 0.1% across all problems
-2. **Consistency**: ctrl-freak has very low variance (0.0004-0.0006), comparable to DEAP
-3. **Speed**: ctrl-freak is ~60% faster than DEAP but ~2x slower than Pymoo
-4. **Pymoo gap**: Pymoo shows lower HV and higher variance, likely due to differences in mutation parameter semantics (per-individual vs per-variable probability)
+Results are produced by running `benchmarks/zdt/run_benchmark.py`. Regenerate benchmark results after operator changes, including crossover or mutation updates, before publishing or comparing numbers.
 
 ### Visual Comparison
 

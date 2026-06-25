@@ -1,6 +1,6 @@
 name: release
 
-on:
+"on":
   release:
     types: [published]
   workflow_dispatch:
@@ -10,7 +10,6 @@ on:
         type: choice
         options:
           - testpypi
-          - pypi
         default: testpypi
 
 concurrency:
