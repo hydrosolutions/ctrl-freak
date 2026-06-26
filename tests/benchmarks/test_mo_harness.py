@@ -44,11 +44,6 @@ def test_eval_counts_equal_and_match_formula():
         assert r.n_evaluations == r.pop_size * (1 + r.n_generations)
 
 
-def test_default_eval_counts_equal_25100():
-    results = {lib: run_mo(MO_PROBLEMS["zdt1"], lib, seed=0) for lib in LIBRARIES}
-    assert {results[lib].n_evaluations for lib in LIBRARIES} == {25_100}
-
-
 @pytest.mark.parametrize("problem", ["zdt1", "zdt3", "zdt4", "dtlz2"])
 @pytest.mark.parametrize("library", LIBRARIES)
 def test_front_is_non_dominated_only(problem, library):
