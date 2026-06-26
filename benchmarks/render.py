@@ -262,7 +262,7 @@ def _provenance_table(meta: dict) -> str:
     --------
     >>> meta = {
     ...     "n_seeds": 30,
-    ...     "versions": {"ctrl_freak": "0.1.0", "pymoo": "0.6.1.6", "deap": "1.4.3", "numpy": "2.4.1"},
+    ...     "versions": {"ctrl_freak": "0.2.0", "pymoo": "0.6.1.6", "deap": "1.4.3", "numpy": "2.4.1"},
     ...     "budgets": {"so_pop_size": 100, "so_n_generations": 200, "mo_pop_size": 100,
     ...                 "mo_n_generations": 250, "sbx_eta": 15.0, "pm_eta": 20.0},
     ... }
@@ -270,7 +270,7 @@ def _provenance_table(meta: dict) -> str:
     | Field | Value |
     |---|---|
     | Seeds | 30 (0–29) |
-    | ctrl-freak | 0.1.0 |
+    | ctrl-freak | 0.2.0 |
     ...
     | SBX / PM eta | 15.0 / 20.0 |
     """

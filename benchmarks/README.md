@@ -19,7 +19,7 @@ artifact.
 | Field | Value |
 |---|---|
 | Seeds | 30 (0–29) |
-| ctrl-freak | 0.1.0 |
+| ctrl-freak | 0.2.0 |
 | pymoo | 0.6.1.6 |
 | deap | 1.4.3 |
 | numpy | 2.4.1 |
