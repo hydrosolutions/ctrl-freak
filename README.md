@@ -82,7 +82,18 @@ See the [full documentation](https://hydrosolutions.github.io/ctrl-freak/) for A
 
 ## Benchmarks
 
-See [benchmarks/](benchmarks/) for the comparison suite.
+ctrl-freak ships a validation benchmark suite that checks `ga()` and `nsga2()`
+against pymoo and DEAP on standard problems with known optima. With the genetic
+algorithm held identical across all three libraries (ported SBX, aligned mutation
+and selection, identical evaluation budget), ctrl-freak's results are statistically
+indistinguishable from both baselines on the single-objective error metrics (all
+six functions) and on multi-objective convergence (ZDT1, ZDT2, ZDT3, and DTLZ2). On
+the two hardest problems (ZDT4, ZDT6) none of the three libraries converges at this
+budget, and ctrl-freak is at least as good as both. The goal is parity, not
+superiority.
+
+See the canonical report in [benchmarks/README.md](benchmarks/README.md) and the
+citable [Validation page](https://hydrosolutions.github.io/ctrl-freak/validation/).
 
 ## Links
 
