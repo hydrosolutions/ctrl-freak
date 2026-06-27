@@ -47,6 +47,7 @@ def nsga2(
     select: str | ParentSelector = "crowded",
     survive: str | SurvivorSelector = "nsga2",
     n_workers: int = 1,
+    evaluate_batch: Callable[[np.ndarray], np.ndarray] | None = None,
 ) -> NSGA2Result:
     """Run NSGA-II multi-objective optimization.
 
@@ -75,6 +76,13 @@ def nsga2(
     n_workers
         Number of workers for objective evaluation. Parallel evaluation is
         deterministic only when ``evaluate`` is pure.
+    evaluate_batch
+        Optional whole-population objective. When provided, it receives the
+        entire ``(pop_size, n_params)`` population matrix in a single call and
+        returns the objective matrix of shape ``(pop_size, n_obj)``. This bypasses
+        the per-individual ``evaluate`` / ``lift`` loop entirely, so ``evaluate``
+        is not called. When ``None`` (default), evaluation falls back to the
+        per-individual ``evaluate`` path and the result is unchanged.
 
     Returns
     -------
@@ -108,6 +116,21 @@ def nsga2(
     ... )
     >>> result.generations
     2
+    >>> # Whole-population evaluation via evaluate_batch (returns (pop_size, n_obj)):
+    >>> def evaluate_batch(pop):
+    ...     return np.stack([pop.sum(axis=1), (1.0 - pop).sum(axis=1)], axis=1)
+    >>> batched = nsga2(
+    ...     init=init,
+    ...     evaluate=evaluate,
+    ...     crossover=lambda p1, p2: (p1 + p2) / 2,
+    ...     mutate=lambda x: x.copy(),
+    ...     pop_size=10,
+    ...     n_generations=2,
+    ...     seed=1,
+    ...     evaluate_batch=evaluate_batch,
+    ... )
+    >>> batched.population.x.shape
+    (10, 2)
     """
     # Validate inputs
     if pop_size <= 0:
@@ -124,8 +147,18 @@ def nsga2(
 
     survivor_selector = SurvivalRegistry.get(survive) if isinstance(survive, str) else survive
 
-    # Create evaluator (parallel or sequential)
-    lifted_evaluate = lift_parallel(evaluate, n_workers) if n_workers != 1 else lift(evaluate)
+    # Create evaluator. When evaluate_batch is supplied it receives the whole
+    # (n, n_params) population matrix in a single call and returns (n, n_obj),
+    # bypassing the per-individual lift / lift_parallel loop. When None, the
+    # per-individual path is preserved byte-for-byte.
+    if evaluate_batch is not None:
+        batch_fn = evaluate_batch
+
+        def lifted_evaluate(x: np.ndarray) -> np.ndarray:
+            return np.asarray(batch_fn(x))
+
+    else:
+        lifted_evaluate = lift_parallel(evaluate, n_workers) if n_workers != 1 else lift(evaluate)
 
     # Derive independent per-phase RNG streams from the single master seed so one seed
     # reproduces init + parent selection + crossover + mutation bit-identically.
