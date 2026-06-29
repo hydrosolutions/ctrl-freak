@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-06-29
+
+### Added
+
+- Optional `evaluate_batch` hook on `ga()` and `nsga2()`. When provided, it receives
+  the entire `(pop_size, n_params)` population matrix in a single call and returns the
+  fitness / objectives for the whole population, bypassing the per-individual
+  `evaluate` / `lift` loop. When omitted (the default), evaluation falls back to the
+  per-individual path and results are byte-for-byte identical to prior releases.
+
 ## [0.2.0] - 2026-06-26
 
 ### Added
@@ -32,6 +42,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Optional parallel evaluation via joblib (`n_workers`).
 - Typed public API shipping a `py.typed` marker (PEP 561).
 
-[Unreleased]: https://github.com/hydrosolutions/ctrl-freak/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/hydrosolutions/ctrl-freak/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/hydrosolutions/ctrl-freak/releases/tag/v0.2.1
 [0.2.0]: https://github.com/hydrosolutions/ctrl-freak/releases/tag/v0.2.0
 [0.1.0]: https://github.com/hydrosolutions/ctrl-freak/releases/tag/v0.1.0
