@@ -20,3 +20,6 @@ archive/
 
 # Docs build
 /site/
+
+# Local planning / decision records (not published)
+planning/
